@@ -9,7 +9,6 @@ authors = [{name = "jini92", email = "jini92@users.noreply.github.com"}]
 keywords = ["knowledge-graph", "obsidian", "second-brain", "graphrag", "semantic-search"]
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
