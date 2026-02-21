@@ -107,15 +107,34 @@ export class MnemoGraphView extends ItemView {
       this.drawEmpty("Open a note, then refresh");
       return;
     }
+    // API는 .md 없는 경로를 사용할 수 있음
     this.centerPath = path;
+    const apiPath = path.replace(/\.md$/, "");
 
-    const data = await this.apiClient.subgraph(path, 2);
+    const data = await this.apiClient.subgraph(apiPath, 1);
     if (!data || data.nodes.length === 0) {
       this.drawEmpty("No graph data for this note");
       return;
     }
 
-    this.buildGraph(data.nodes, data.edges, path);
+    // 노드 수 제한 (성능 — 최대 80노드)
+    let nodes = data.nodes;
+    let edges = data.edges;
+    if (nodes.length > 80) {
+      const centerNode = nodes.find(n => n.id === path || n.id === path.replace(/\.md$/, ""));
+      const keep = new Set<string>();
+      if (centerNode) keep.add(centerNode.id);
+      // score 높은 순으로 80개
+      const sorted = [...nodes].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      for (const n of sorted) {
+        if (keep.size >= 80) break;
+        keep.add(n.id);
+      }
+      nodes = nodes.filter(n => keep.has(n.id));
+      edges = edges.filter(e => keep.has(e.source) && keep.has(e.target));
+    }
+
+    this.buildGraph(nodes, edges, apiPath);
     this.runSimulation();
   }
 
