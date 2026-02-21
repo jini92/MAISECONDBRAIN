@@ -1,0 +1,10 @@
+{
+  "id": "mnemo-secondbrain",
+  "name": "Mnemo SecondBrain",
+  "version": "0.1.0",
+  "minAppVersion": "1.0.0",
+  "description": "Personal knowledge graph with hybrid search (keyword + vector + graph). Powered by Mnemo.",
+  "author": "jini92",
+  "authorUrl": "https://github.com/jini92",
+  "isDesktopOnly": false
+}
