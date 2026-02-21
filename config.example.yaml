@@ -1,0 +1,21 @@
+# Mnemo SecondBrain - Environment Configuration
+# Copy this file or set these environment variables before running scripts.
+
+# Required: Path to your Obsidian vault (or any markdown notes directory)
+# Example: /home/user/ObsidianVault or C:\Users\you\Documents\MyVault
+MNEMO_VAULT_PATH: ""
+
+# Required for scripts that access MAIBOT memory (daily_enrich, embed_vault, integrated_search)
+# Example: /home/user/maibot/memory
+MNEMO_MEMORY_PATH: ""
+
+# Optional: Project root override (defaults to repository root)
+# Used by generate_stubs for cache directory resolution
+MNEMO_PROJECT_ROOT: ""
+
+# Optional: MAIBOT root directory (for MEMORY.md location in integrated_search)
+# If not set, defaults to parent of MNEMO_MEMORY_PATH
+MAIBOT_ROOT: ""
+
+# Optional: Brave Search API key (for external knowledge collection)
+BRAVE_API_KEY: ""
