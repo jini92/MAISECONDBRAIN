@@ -1,0 +1,16 @@
+{
+  "name": "mnemo-secondbrain",
+  "version": "0.1.0",
+  "description": "Obsidian plugin for Mnemo SecondBrain - hybrid knowledge graph search",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.24.0",
+    "obsidian": "latest",
+    "typescript": "^5.7.0"
+  }
+}

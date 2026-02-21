@@ -1,0 +1,35 @@
+/* Mnemo SecondBrain - Obsidian Plugin Styles */
+
+.mnemo-search-result {
+  padding: 4px 0;
+}
+
+.mnemo-result-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.mnemo-result-snippet {
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 2px;
+}
+
+.mnemo-result-score {
+  color: var(--text-faint);
+  font-size: 0.8em;
+}
+
+.mnemo-graph-info p {
+  margin: 4px 0;
+}
+
+.mnemo-error {
+  color: var(--text-error);
+}
+
+.mnemo-placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 16px;
+}
