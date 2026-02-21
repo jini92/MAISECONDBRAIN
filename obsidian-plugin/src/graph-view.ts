@@ -55,6 +55,7 @@ export class MnemoGraphView extends ItemView {
   private simIterations = 0;
 
   private centerPath = "";
+  private viewMode: "local" | "full" = "local";
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -76,8 +77,14 @@ export class MnemoGraphView extends ItemView {
     const toolbar = container.createDiv({ cls: "mnemo-graph-toolbar" });
     toolbar.createEl("span", { text: "Mnemo Graph", cls: "mnemo-graph-title" });
 
+    const localBtn = toolbar.createEl("button", { text: "📍 Local", cls: "mnemo-graph-btn mnemo-graph-btn-active", attr: { title: "Current note graph" } });
+    localBtn.addEventListener("click", () => { this.setMode("local", localBtn, fullBtn); });
+
+    const fullBtn = toolbar.createEl("button", { text: "🌐 Full", cls: "mnemo-graph-btn", attr: { title: "Full knowledge graph" } });
+    fullBtn.addEventListener("click", () => { this.setMode("full", fullBtn, localBtn); });
+
     const refreshBtn = toolbar.createEl("button", { text: "↻", cls: "mnemo-graph-btn", attr: { title: "Refresh" } });
-    refreshBtn.addEventListener("click", () => this.loadGraph());
+    refreshBtn.addEventListener("click", () => this.viewMode === "full" ? this.loadFullGraph() : this.loadGraph());
 
     const fitBtn = toolbar.createEl("button", { text: "⊡", cls: "mnemo-graph-btn", attr: { title: "Fit to view" } });
     fitBtn.addEventListener("click", () => this.fitToView());
@@ -140,6 +147,51 @@ export class MnemoGraphView extends ItemView {
 
   setCenterPath(path: string): void {
     this.loadGraph(path);
+  }
+
+  private setMode(mode: "local" | "full", activeBtn: HTMLElement, inactiveBtn: HTMLElement): void {
+    this.viewMode = mode;
+    activeBtn.addClass("mnemo-graph-btn-active");
+    inactiveBtn.removeClass("mnemo-graph-btn-active");
+    if (mode === "full") {
+      this.loadFullGraph();
+    } else {
+      this.loadGraph();
+    }
+  }
+
+  async loadFullGraph(): Promise<void> {
+    this.drawEmpty("Loading full graph...");
+    const data = await this.apiClient.fullGraph();
+    if (!data || data.nodes.length === 0) {
+      this.drawEmpty("No graph data");
+      return;
+    }
+
+    // 사전 계산된 좌표 사용 — 시뮬레이션 불필요
+    const w = this.canvas!.width;
+    const h = this.canvas!.height;
+
+    this.nodes = data.nodes.map((n: any) => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      score: n.degree,
+      x: (n.x / 1000) * w * 0.9 + w * 0.05,
+      y: (n.y / 1000) * h * 0.9 + h * 0.05,
+      vx: 0,
+      vy: 0,
+      radius: Math.max(3, Math.min(16, 3 + (n.degree || 0) * 0.05)),
+      isCenter: false,
+    }));
+
+    this.edges = data.edges;
+    this.nodeMap = new Map(this.nodes.map((n) => [n.id, n]));
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.scale = 1;
+    this.simRunning = false;
+    this.draw();
   }
 
   // ===== 그래프 빌드 =====

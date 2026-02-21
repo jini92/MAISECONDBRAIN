@@ -393,6 +393,66 @@ def enrich():
         raise HTTPException(500, f"Enrichment failed: {e}")
 
 
+# ── GET /graph/full — 전체 그래프 (사전 계산 레이아웃) ────────
+@app.get("/graph/full")
+def full_graph(
+    max_nodes: int = Query(3500, ge=100, le=10000),
+):
+    """전체 그래프를 사전 계산된 레이아웃 좌표와 함께 반환.
+    
+    networkx spring_layout으로 좌표를 미리 계산하여 
+    클라이언트는 렌더링만 수행 (실시간 시뮬레이션 불필요).
+    """
+    G = _get_graph()
+    
+    # 노드 수 제한 (PageRank 상위)
+    if G.number_of_nodes() > max_nodes:
+        pr = nx.pagerank(G)
+        top = sorted(pr, key=pr.get, reverse=True)[:max_nodes]
+        G = G.subgraph(top).copy()
+    
+    # 사전 레이아웃 계산 (캐시)
+    layout_key = f"layout_{G.number_of_nodes()}"
+    if layout_key not in _state:
+        pos = nx.spring_layout(G, k=0.5, iterations=50, seed=42)
+        # 좌표를 0~1000 범위로 정규화
+        if pos:
+            xs = [p[0] for p in pos.values()]
+            ys = [p[1] for p in pos.values()]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            rx = (max_x - min_x) or 1
+            ry = (max_y - min_y) or 1
+            pos = {k: ((v[0] - min_x) / rx * 1000, (v[1] - min_y) / ry * 1000) for k, v in pos.items()}
+        _state[layout_key] = pos
+    else:
+        pos = _state[layout_key]
+    
+    nodes = []
+    for n in G.nodes():
+        nd = G.nodes.get(n, {})
+        p = pos.get(n, (500, 500))
+        nodes.append({
+            "id": n,
+            "name": nd.get("name", n.rsplit("/", 1)[-1]),
+            "type": nd.get("entity_type", "unknown"),
+            "x": round(p[0], 1),
+            "y": round(p[1], 1),
+            "degree": G.degree(n),
+        })
+    
+    edges = []
+    for u, v in G.edges():
+        ed = G.edges.get((u, v), {})
+        edges.append({
+            "source": u,
+            "target": v,
+            "type": ed.get("type", "link"),
+        })
+    
+    return {"nodes": nodes, "edges": edges, "layout": "precomputed"}
+
+
 # ── Legacy endpoints (backward compat) ──────────────────────
 @app.get("/api/stats")
 def get_stats_legacy():

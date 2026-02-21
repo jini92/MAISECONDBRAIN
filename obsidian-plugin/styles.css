@@ -71,6 +71,12 @@
   background: var(--interactive-hover);
 }
 
+.mnemo-graph-btn-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
 .mnemo-graph-canvas {
   flex: 1;
   width: 100%;

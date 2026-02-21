@@ -91,6 +91,18 @@ export class MnemoApiClient {
     }
   }
 
+  // 전체 그래프 (사전 계산 레이아웃) / Full graph with precomputed layout
+  async fullGraph(): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[]; layout: string } | null> {
+    const url = `${this.baseUrl}/graph/full`;
+    try {
+      const response = await requestUrl({ url, method: "GET" });
+      return response.json as { nodes: SubgraphNode[]; edges: SubgraphEdge[]; layout: string };
+    } catch (err) {
+      this.handleError(err);
+      return null;
+    }
+  }
+
   // 에러 처리 / Error handling with friendly messages
   private handleError(err: unknown): void {
     const msg = err instanceof Error ? err.message : String(err);
