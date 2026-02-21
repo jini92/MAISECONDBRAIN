@@ -37,22 +37,16 @@ export default class MnemoPlugin extends Plugin {
       (leaf) => new MnemoGraphView(leaf, this.apiClient)
     );
 
+    // 그래프 뷰 리본 아이콘
+    this.addRibbonIcon("git-fork", "Mnemo Graph", () => {
+      this.openGraphView();
+    });
+
     // 그래프 뷰 열기 커맨드
     this.addCommand({
       id: "mnemo-open-graph",
-      name: "Open Mnemo Graph",
-      callback: async () => {
-        const existing = this.app.workspace.getLeavesOfType(MNEMO_GRAPH_VIEW_TYPE);
-        if (existing.length > 0) {
-          this.app.workspace.revealLeaf(existing[0]);
-        } else {
-          const leaf = this.app.workspace.getRightLeaf(false);
-          if (leaf) {
-            await leaf.setViewState({ type: MNEMO_GRAPH_VIEW_TYPE, active: true });
-            this.app.workspace.revealLeaf(leaf);
-          }
-        }
-      },
+      name: "Mnemo: Open Graph View",
+      callback: () => this.openGraphView(),
     });
 
     // 서버 상태 확인 / Check server on load
@@ -82,5 +76,24 @@ export default class MnemoPlugin extends Plugin {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  private async openGraphView(): Promise<void> {
+    const existing = this.app.workspace.getLeavesOfType(MNEMO_GRAPH_VIEW_TYPE);
+    let leaf: import("obsidian").WorkspaceLeaf;
+    if (existing.length > 0) {
+      leaf = existing[0];
+    } else {
+      leaf = this.app.workspace.getRightLeaf(false)!;
+      await leaf.setViewState({ type: MNEMO_GRAPH_VIEW_TYPE, active: true });
+    }
+    this.app.workspace.revealLeaf(leaf);
+
+    // 현재 노트 기준으로 그래프 로드
+    const file = this.app.workspace.getActiveFile();
+    if (file) {
+      const view = leaf.view as MnemoGraphView;
+      view.setCenterPath(file.path);
+    }
   }
 }

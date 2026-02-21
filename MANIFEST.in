@@ -1,0 +1,18 @@
+include LICENSE
+include README.md
+include pyproject.toml
+include config.example.yaml
+
+recursive-include src *.py
+recursive-include scripts *.py
+recursive-include docs *.md
+
+recursive-exclude .mnemo *
+recursive-exclude obsidian-plugin *
+recursive-exclude __pycache__ *
+recursive-exclude * *.pyc *.pyo
+exclude .env
+exclude .env.*
+prune .mnemo
+prune obsidian-plugin
+prune ~ 

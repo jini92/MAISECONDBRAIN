@@ -1,2 +1,2 @@
-"""Mnemo — 개인화 세컨드브레인 GraphRAG 엔진"""
-__version__ = "0.1.0"
+"""Mnemo — Personal knowledge graph engine for Obsidian vaults."""
+__version__ = "0.2.0"

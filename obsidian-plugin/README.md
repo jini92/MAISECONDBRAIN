@@ -1,43 +1,75 @@
-# Mnemo SecondBrain - Obsidian Plugin
+# Mnemo SecondBrain
 
-Obsidian 볼트에서 Mnemo 지식 그래프를 검색하고 탐색하는 플러그인.
+Personal knowledge graph with hybrid search (keyword + vector + graph) for your Obsidian vault. Powered by [Mnemo](https://github.com/jini92/MAISECONDBRAIN).
+
+![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=8b6cef&label=downloads&query=%24%5B%22mnemo-secondbrain%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)
 
 ## Features
 
-- **Hybrid Search** (Ctrl+Shift+M): keyword + vector + graph 통합 검색
-- **Graph View**: 지식 그래프 시각화 (개발 중)
-- **Server Status**: Mnemo 서버 상태 확인
+- **Hybrid Search** (`Ctrl+Shift+M`): Combines keyword, vector (semantic), and graph-based search for highly relevant results
+- **Knowledge Graph View**: Visualize connections between your notes (in development)
+- **Server Status**: Check Mnemo API server connectivity from within Obsidian
+
+<!-- TODO: Add screenshots -->
+
+## Prerequisites
+
+This plugin requires a running **Mnemo API server**. Mnemo is a self-hosted knowledge graph engine.
+
+1. Clone the Mnemo repo: `git clone https://github.com/jini92/MAISECONDBRAIN.git`
+2. Install dependencies: `pip install -e .`
+3. Start the server: `python -m uvicorn src.api:app --host 127.0.0.1 --port 8000`
 
 ## Installation
 
-### Manual Install
-1. `obsidian-plugin/` 폴더에서 빌드:
-   ```bash
-   npm install
-   npm run build
-   ```
-2. `main.js`, `manifest.json`, `styles.css`를 볼트의 `.obsidian/plugins/mnemo-secondbrain/`에 복사
-3. Obsidian → Settings → Community plugins → Mnemo SecondBrain 활성화
+### From Community Plugins (Recommended)
+
+1. Open Obsidian → Settings → Community plugins
+2. Click **Browse** and search for **"Mnemo SecondBrain"**
+3. Click **Install**, then **Enable**
+
+### Manual Installation
+
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/jini92/MAISECONDBRAIN/releases/latest)
+2. Copy them to your vault: `.obsidian/plugins/mnemo-secondbrain/`
+3. Obsidian → Settings → Community plugins → Enable **Mnemo SecondBrain**
+
+### Build from Source
+
+```bash
+cd obsidian-plugin
+npm install
+npm run build
+```
+
+Copy `main.js`, `manifest.json`, `styles.css` to `.obsidian/plugins/mnemo-secondbrain/`.
 
 ## Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| API URL | `http://127.0.0.1:8000` | Mnemo FastAPI 서버 주소 |
-| Search limit | 10 | 검색 결과 최대 개수 |
-| Search mode | hybrid | hybrid / vector / keyword / graph |
+| API URL | `http://127.0.0.1:8000` | Mnemo FastAPI server address |
+| Search limit | `10` | Maximum number of search results |
+| Search mode | `hybrid` | `hybrid` / `vector` / `keyword` / `graph` |
 
 ## Usage
 
-1. Mnemo 서버 실행: `cd C:\TEST\MAISECONDBRAIN && python -m uvicorn src.api:app`
-2. Obsidian에서 `Ctrl+Shift+M` → 검색어 입력
-3. 결과 선택 → 해당 노트 열기
+1. Start the Mnemo API server
+2. In Obsidian, press `Ctrl+Shift+M` (or `Cmd+Shift+M` on macOS)
+3. Type your search query
+4. Select a result to open the corresponding note
 
-## Requirements
+## FAQ
 
-- Mnemo FastAPI 서버 실행 중
-- Obsidian 1.0.0+
+**Q: Does this work on mobile?**
+A: The plugin itself is mobile-compatible, but you need network access to a running Mnemo API server. If your server is accessible over the network (not just localhost), it will work on mobile.
 
-## Screenshots
+**Q: Is my data sent to external servers?**
+A: No. All data stays between Obsidian and your self-hosted Mnemo server. No telemetry or external calls.
 
-<!-- TODO: 스크린샷 추가 -->
+**Q: What if the server is not running?**
+A: The plugin will show a connection error. Search functionality requires the Mnemo server to be running.
+
+## License
+
+[MIT](../LICENSE)

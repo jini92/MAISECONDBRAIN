@@ -18,6 +18,19 @@ export interface MnemoStats {
   index_status: string;
 }
 
+export interface SubgraphNode {
+  id: string;
+  name: string;
+  type: string;
+  score?: number;
+}
+
+export interface SubgraphEdge {
+  source: string;
+  target: string;
+  type: string;
+}
+
 export class MnemoApiClient {
   constructor(private baseUrl: string) {}
 
@@ -56,6 +69,22 @@ export class MnemoApiClient {
         method: "GET",
       });
       return response.json as MnemoStats;
+    } catch (err) {
+      this.handleError(err);
+      return null;
+    }
+  }
+
+  // 서브그래프 조회 / Get subgraph for visualization
+  async subgraph(
+    center: string,
+    depth: number = 2
+  ): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[] } | null> {
+    const params = new URLSearchParams({ center, depth: String(depth) });
+    const url = `${this.baseUrl}/graph/subgraph?${params}`;
+    try {
+      const response = await requestUrl({ url, method: "GET" });
+      return response.json as { nodes: SubgraphNode[]; edges: SubgraphEdge[] };
     } catch (err) {
       this.handleError(err);
       return null;
