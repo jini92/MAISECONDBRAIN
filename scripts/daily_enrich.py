@@ -1,4 +1,4 @@
-﻿"""留ㅼ씪 ?먮룞 蹂쇳듃 蹂닿컯 ?뚯씠?꾨씪??""
+﻿"""留ㅼ씪 ?먮룞 蹂쇳듃 蹂닿컯 ?뚯씠?꾨씪??"""
 import sys
 import os
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
@@ -93,10 +93,12 @@ print(f"  {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
 # 5.5. Generate stub notes for dangling references
 print("\n[6/9] Generating stub notes for dangling references...")
 try:
-    from scripts.generate_stubs import load_graph, find_dangling, is_image_ref, file_exists_in_vault, generate_stub_content
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).parent))
+    from generate_stubs import load_graph, find_dangling, is_image_ref, file_exists_in_vault, generate_stub_content
     import os as _os
     dangling_list = find_dangling(G, top_n=50)
-    stub_dir = _os.path.join(str(VAULT), "03.RESOURCES", "?ㅽ뀅")
+    stub_dir = _os.path.join(str(VAULT), "03.RESOURCES", "\uc2a4\ud141")
     _os.makedirs(stub_dir, exist_ok=True)
     stub_created = 0
     for name, count, source_notes in dangling_list:
