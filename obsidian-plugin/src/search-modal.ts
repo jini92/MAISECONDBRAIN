@@ -51,7 +51,8 @@ export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
 
   async onChooseSuggestion(result: MnemoSearchResult): Promise<void> {
     // 볼트에서 해당 노트 열기 / Open matching note in vault
-    const path = result.path || `${result.title}.md`;
+    let path = result.path || `${result.title}.md`;
+    if (!path.endsWith(".md")) path += ".md";
     const file = this.app.vault.getAbstractFileByPath(path);
 
     if (file instanceof TFile) {

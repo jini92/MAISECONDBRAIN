@@ -2,10 +2,11 @@ import { requestUrl } from "obsidian";
 
 // Mnemo API 검색 결과 타입 / Search result type
 export interface MnemoSearchResult {
-  id: string;
+  name: string;
   title: string;
   snippet: string;
   score: number;
+  entity_type?: string;
   source?: string;
   path?: string;
 }
@@ -35,7 +36,12 @@ export class MnemoApiClient {
 
     try {
       const response = await requestUrl({ url, method: "GET" });
-      return response.json as MnemoSearchResult[];
+      const data = response.json;
+      const results = (data.results ?? data) as any[];
+      return results.map((r: any) => ({
+        ...r,
+        title: r.title || r.name || r.key || "Untitled",
+      }));
     } catch (err) {
       this.handleError(err);
       return [];
