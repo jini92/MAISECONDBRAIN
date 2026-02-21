@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import networkx as nx
 import numpy as np
 
+from .reranker import is_reranker_enabled, rerank_search_results
 from .vector_search import search as vector_search
 
 
@@ -138,4 +139,36 @@ def hybrid_search(
         ))
 
     results.sort(key=lambda x: x.score, reverse=True)
+
+    # Reranker 적용 (활성화된 경우)
+    if is_reranker_enabled() and results:
+        # reranker용으로 더 많은 후보 확보 후 재정렬
+        candidates = results[:top_k * 3]
+        rerank_input = [
+            {
+                "key": r.key,
+                "name": r.name,
+                "snippet": notes_content.get(r.key, r.name)[:500],
+                "score": r.score,
+                "keyword_score": r.keyword_score,
+                "vector_score": r.vector_score,
+                "graph_score": r.graph_score,
+                "entity_type": r.entity_type,
+            }
+            for r in candidates
+        ]
+        reranked = rerank_search_results(query, rerank_input, top_k=top_k)
+        results = [
+            SearchResult(
+                key=r["key"],
+                name=r["name"],
+                score=r.get("rerank_score", r["score"]),
+                keyword_score=r["keyword_score"],
+                vector_score=r["vector_score"],
+                graph_score=r["graph_score"],
+                entity_type=r["entity_type"],
+            )
+            for r in reranked
+        ]
+
     return results[:top_k]

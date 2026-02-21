@@ -1,8 +1,9 @@
-"""임베딩 생성기 — OpenAI / Ollama 지원"""
+"""임베딩 생성기 — OpenAI / Ollama / SentenceTransformers 지원"""
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,7 +16,34 @@ EMBEDDING_DIM = {
     "text-embedding-3-small": 1536,
     "text-embedding-3-large": 3072,
     "nomic-embed-text": 768,
+    "all-MiniLM-L6-v2": 384,
+    "jhgan/ko-sroberta-multitask": 768,
+    "intfloat/multilingual-e5-base": 768,
 }
+
+# 선택 가능한 sentence-transformers 모델
+SBERT_MODELS = {
+    "default": "all-MiniLM-L6-v2",
+    "korean": "jhgan/ko-sroberta-multitask",
+    "multilingual": "intfloat/multilingual-e5-base",
+}
+
+# lazy-loaded singleton
+_sbert_model = None
+_sbert_model_name = None
+
+
+def _get_sbert_model(model_name: str | None = None):
+    """SentenceTransformer 모델 lazy loading (싱글톤)"""
+    global _sbert_model, _sbert_model_name
+    if model_name is None:
+        model_key = os.environ.get("MNEMO_EMBEDDING_MODEL", "default")
+        model_name = SBERT_MODELS.get(model_key, model_key)
+    if _sbert_model is None or _sbert_model_name != model_name:
+        from sentence_transformers import SentenceTransformer
+        _sbert_model = SentenceTransformer(model_name)
+        _sbert_model_name = model_name
+    return _sbert_model
 
 
 def _prepare_text(note: NoteDocument, max_chars: int = 2000) -> str:
@@ -92,6 +120,33 @@ def embed_ollama(
     return embeddings
 
 
+def embed_sbert(
+    texts: dict[str, str],
+    model: str | None = None,
+    batch_size: int = 64,
+) -> dict[str, np.ndarray]:
+    """SentenceTransformers 로컬 모델로 임베딩 생성"""
+    st_model = _get_sbert_model(model)
+    names = list(texts.keys())
+    sentences = [texts[n] for n in names]
+    # e5 모델은 query/passage prefix 필요
+    if model and "e5" in model:
+        sentences = [f"passage: {s}" for s in sentences]
+    vectors = st_model.encode(sentences, batch_size=batch_size, show_progress_bar=False,
+                               convert_to_numpy=True, normalize_embeddings=True)
+    return {name: vec.astype(np.float32) for name, vec in zip(names, vectors)}
+
+
+def embed_query_sbert(query: str, model: str | None = None) -> np.ndarray:
+    """단일 쿼리를 SentenceTransformers로 임베딩"""
+    st_model = _get_sbert_model(model)
+    text = query
+    if model and "e5" in model:
+        text = f"query: {query}"
+    vec = st_model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
+    return vec.astype(np.float32)
+
+
 def embed_notes(
     notes: list[NoteDocument],
     provider: str = "openai",
@@ -137,6 +192,8 @@ def embed_notes(
         new_embeddings = embed_openai(texts, model=model or "text-embedding-3-small", api_key=api_key)
     elif provider == "ollama":
         new_embeddings = embed_ollama(texts, model=model or "nomic-embed-text")
+    elif provider == "sbert":
+        new_embeddings = embed_sbert(texts, model=model)
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
