@@ -430,8 +430,14 @@ export class MnemoGraphView extends ItemView {
       ctx.fillStyle = this.isDarkTheme() ? "#e0e0e0" : "#333333";
       ctx.font = n.isCenter ? "bold 11px sans-serif" : "10px sans-serif";
       ctx.textAlign = "center";
-      const label = n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name;
-      ctx.fillText(label, n.x, n.y + n.radius + 14);
+      const isHov = this.hoveredNode === n;
+      if (isHov || n.isCenter) {
+        const label = n.name.length > 40 ? n.name.slice(0, 38) + "…" : n.name;
+        ctx.fillText(label, n.x, n.y + n.radius + 14);
+      } else if (this.scale > 0.6 && n.radius >= 5) {
+        const short = n.name.length > 12 ? n.name.slice(0, 10) + "…" : n.name;
+        ctx.fillText(short, n.x, n.y + n.radius + 14);
+      }
     }
 
     ctx.restore();
