@@ -90,6 +90,21 @@ cache.save_graph(G)
 cache.save_stats(stats)
 print(f"  {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
 
+# 5.1. Graph quality improvement — reduce components + classify unknowns
+print("\n[5.1] Improving graph quality...")
+try:
+    from reduce_components import reduce_components
+    from classify_unknown import classify_unknowns
+    reduce_result = reduce_components(G)
+    classify_result = classify_unknowns(G)
+    cache.save_graph(G)
+    stats = graph_stats(G)
+    cache.save_stats(stats)
+    print(f"  Components: {reduce_result['before']['components']} -> {reduce_result['after']['components']}")
+    print(f"  Unknown classified: {sum(classify_result.values())}")
+except Exception as e:
+    print(f"  Graph quality improvement error (skipped): {e}")
+
 # 5.5. Generate stub notes for dangling references
 print("\n[6/9] Generating stub notes for dangling references...")
 try:
