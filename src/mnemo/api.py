@@ -453,6 +453,150 @@ def full_graph(
     return {"nodes": nodes, "edges": edges, "layout": "precomputed"}
 
 
+# ── GET /graph/clusters — 커뮤니티 기반 계층적 그래프 ─────────
+@app.get("/graph/clusters")
+def graph_clusters():
+    """Louvain 커뮤니티 탐지 → 클러스터 단위로 그래프 반환.
+    
+    Level 0: 클러스터 요약 (클러스터별 대표 노드, 크기, 주요 타입)
+    """
+    G = _get_graph()
+    UG = G.to_undirected()
+    
+    try:
+        from networkx.algorithms.community import louvain_communities
+        communities = louvain_communities(UG, seed=42, resolution=1.0)
+    except Exception:
+        # fallback: connected components
+        communities = list(nx.connected_components(UG))
+    
+    # 클러스터 정보 수집
+    clusters = []
+    for i, comm in enumerate(sorted(communities, key=len, reverse=True)):
+        sub = G.subgraph(comm)
+        # 대표 노드 (degree 가장 높은 노드)
+        hub = max(comm, key=lambda n: G.degree(n))
+        hub_data = G.nodes.get(hub, {})
+        
+        # 타입 분포
+        types = {}
+        for n in comm:
+            t = G.nodes.get(n, {}).get("entity_type", "unknown")
+            types[t] = types.get(t, 0) + 1
+        dominant_type = max(types, key=types.get) if types else "unknown"
+        
+        # 주요 태그
+        all_tags = []
+        for n in comm:
+            all_tags.extend(G.nodes.get(n, {}).get("tags", []))
+        tag_counts = {}
+        for t in all_tags:
+            tag_counts[t] = tag_counts.get(t, 0) + 1
+        top_tags = sorted(tag_counts, key=tag_counts.get, reverse=True)[:5]
+        
+        clusters.append({
+            "id": f"cluster_{i}",
+            "index": i,
+            "size": len(comm),
+            "hub": hub,
+            "hub_name": hub_data.get("name", hub.rsplit("/", 1)[-1]),
+            "dominant_type": dominant_type,
+            "type_distribution": types,
+            "top_tags": top_tags,
+            "internal_edges": sub.number_of_edges(),
+        })
+    
+    # 클러스터 간 엣지
+    node_to_cluster = {}
+    for i, comm in enumerate(sorted(communities, key=len, reverse=True)):
+        for n in comm:
+            node_to_cluster[n] = i
+    
+    cluster_edges = {}
+    for u, v in G.edges():
+        cu = node_to_cluster.get(u, -1)
+        cv = node_to_cluster.get(v, -1)
+        if cu != cv and cu >= 0 and cv >= 0:
+            key = (min(cu, cv), max(cu, cv))
+            cluster_edges[key] = cluster_edges.get(key, 0) + 1
+    
+    edges = [{"source": f"cluster_{s}", "target": f"cluster_{t}", "weight": w} 
+             for (s, t), w in cluster_edges.items()]
+    
+    # 레이아웃 계산 (클러스터 그래프)
+    CG = nx.Graph()
+    for c in clusters:
+        CG.add_node(c["id"])
+    for e in edges:
+        CG.add_edge(e["source"], e["target"], weight=e["weight"])
+    
+    pos = nx.spring_layout(CG, k=2.0, iterations=50, seed=42) if CG.nodes() else {}
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        rx = (max(xs) - min(xs)) or 1
+        ry = (max(ys) - min(ys)) or 1
+        for c in clusters:
+            p = pos.get(c["id"], (0.5, 0.5))
+            c["x"] = round((p[0] - min(xs)) / rx * 1000, 1)
+            c["y"] = round((p[1] - min(ys)) / ry * 1000, 1)
+    
+    return {"clusters": clusters, "edges": edges, "total_nodes": G.number_of_nodes()}
+
+
+@app.get("/graph/cluster/{index}")
+def cluster_detail(index: int, max_nodes: int = Query(200, ge=10, le=1000)):
+    """특정 클러스터 내부 노드 상세 (drill-down)."""
+    G = _get_graph()
+    UG = G.to_undirected()
+    
+    try:
+        from networkx.algorithms.community import louvain_communities
+        communities = louvain_communities(UG, seed=42, resolution=1.0)
+    except Exception:
+        communities = list(nx.connected_components(UG))
+    
+    sorted_comms = sorted(communities, key=len, reverse=True)
+    if index < 0 or index >= len(sorted_comms):
+        raise HTTPException(404, f"Cluster {index} not found")
+    
+    comm = sorted_comms[index]
+    sub = G.subgraph(comm).copy()
+    
+    # 노드 수 제한
+    if len(comm) > max_nodes:
+        pr = nx.pagerank(sub)
+        top = sorted(pr, key=pr.get, reverse=True)[:max_nodes]
+        sub = sub.subgraph(top).copy()
+    
+    # 레이아웃
+    pos = nx.spring_layout(sub, k=0.8, iterations=50, seed=42)
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        rx = (max(xs) - min(xs)) or 1
+        ry = (max(ys) - min(ys)) or 1
+        pos = {k: ((v[0] - min(xs)) / rx * 1000, (v[1] - min(ys)) / ry * 1000) for k, v in pos.items()}
+    
+    nodes = []
+    for n in sub.nodes():
+        nd = G.nodes.get(n, {})
+        p = pos.get(n, (500, 500))
+        nodes.append({
+            "id": n,
+            "name": nd.get("name", n.rsplit("/", 1)[-1]),
+            "type": nd.get("entity_type", "unknown"),
+            "x": round(p[0], 1),
+            "y": round(p[1], 1),
+            "degree": sub.degree(n),
+        })
+    
+    edges = [{"source": u, "target": v, "type": G.edges.get((u, v), {}).get("type", "link")}
+             for u, v in sub.edges()]
+    
+    return {"cluster_index": index, "nodes": nodes, "edges": edges, "layout": "precomputed"}
+
+
 # ── Legacy endpoints (backward compat) ──────────────────────
 @app.get("/api/stats")
 def get_stats_legacy():

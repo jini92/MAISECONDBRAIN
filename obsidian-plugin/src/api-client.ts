@@ -91,6 +91,28 @@ export class MnemoApiClient {
     }
   }
 
+  // 클러스터 그래프 (계층적 탐색) / Cluster graph for drill-down
+  async clusters(): Promise<any | null> {
+    try {
+      const response = await requestUrl({ url: `${this.baseUrl}/graph/clusters`, method: "GET" });
+      return response.json;
+    } catch (err) {
+      this.handleError(err);
+      return null;
+    }
+  }
+
+  // 클러스터 상세 (drill-down) / Cluster detail
+  async clusterDetail(index: number): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[] } | null> {
+    try {
+      const response = await requestUrl({ url: `${this.baseUrl}/graph/cluster/${index}`, method: "GET" });
+      return response.json as { nodes: SubgraphNode[]; edges: SubgraphEdge[] };
+    } catch (err) {
+      this.handleError(err);
+      return null;
+    }
+  }
+
   // 전체 그래프 (사전 계산 레이아웃) / Full graph with precomputed layout
   async fullGraph(): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[]; layout: string } | null> {
     const url = `${this.baseUrl}/graph/full`;

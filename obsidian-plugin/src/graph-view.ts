@@ -55,7 +55,10 @@ export class MnemoGraphView extends ItemView {
   private simIterations = 0;
 
   private centerPath = "";
-  private viewMode: "local" | "full" = "local";
+  private viewMode: "local" | "full" | "cluster" = "local";
+  private clusterData: any[] = [];
+  private backBtn: HTMLElement | null = null;
+  private allBtns: HTMLElement[] = [];
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -78,10 +81,19 @@ export class MnemoGraphView extends ItemView {
     toolbar.createEl("span", { text: "Mnemo Graph", cls: "mnemo-graph-title" });
 
     const localBtn = toolbar.createEl("button", { text: "📍 Local", cls: "mnemo-graph-btn mnemo-graph-btn-active", attr: { title: "Current note graph" } });
-    localBtn.addEventListener("click", () => { this.setMode("local", localBtn, fullBtn); });
+    localBtn.addEventListener("click", () => { this.setActiveBtn(localBtn); this.viewMode = "local"; this.loadGraph(); });
+
+    const clusterBtn = toolbar.createEl("button", { text: "🔮 Explore", cls: "mnemo-graph-btn", attr: { title: "Explore by clusters (drill-down)" } });
+    clusterBtn.addEventListener("click", () => { this.setActiveBtn(clusterBtn); this.viewMode = "cluster"; this.loadClusters(); });
 
     const fullBtn = toolbar.createEl("button", { text: "🌐 Full", cls: "mnemo-graph-btn", attr: { title: "Full knowledge graph" } });
-    fullBtn.addEventListener("click", () => { this.setMode("full", fullBtn, localBtn); });
+    fullBtn.addEventListener("click", () => { this.setActiveBtn(fullBtn); this.viewMode = "full"; this.loadFullGraph(); });
+
+    this.backBtn = toolbar.createEl("button", { text: "← Back", cls: "mnemo-graph-btn", attr: { title: "Back to clusters" } });
+    this.backBtn.style.display = "none";
+    this.backBtn.addEventListener("click", () => { this.backBtn!.style.display = "none"; this.loadClusters(); });
+
+    this.allBtns = [localBtn, clusterBtn, fullBtn];
 
     const refreshBtn = toolbar.createEl("button", { text: "↻", cls: "mnemo-graph-btn", attr: { title: "Refresh" } });
     refreshBtn.addEventListener("click", () => this.viewMode === "full" ? this.loadFullGraph() : this.loadGraph());
@@ -149,15 +161,84 @@ export class MnemoGraphView extends ItemView {
     this.loadGraph(path);
   }
 
-  private setMode(mode: "local" | "full", activeBtn: HTMLElement, inactiveBtn: HTMLElement): void {
-    this.viewMode = mode;
-    activeBtn.addClass("mnemo-graph-btn-active");
-    inactiveBtn.removeClass("mnemo-graph-btn-active");
-    if (mode === "full") {
-      this.loadFullGraph();
-    } else {
-      this.loadGraph();
+  private setActiveBtn(active: HTMLElement): void {
+    for (const btn of this.allBtns) btn.removeClass("mnemo-graph-btn-active");
+    active.addClass("mnemo-graph-btn-active");
+    if (this.backBtn) this.backBtn.style.display = "none";
+  }
+
+  async loadClusters(): Promise<void> {
+    this.drawEmpty("Loading clusters...");
+    const data = await this.apiClient.clusters();
+    if (!data || !data.clusters || data.clusters.length === 0) {
+      this.drawEmpty("No cluster data");
+      return;
     }
+
+    this.clusterData = data.clusters;
+    const w = this.canvas!.width;
+    const h = this.canvas!.height;
+
+    this.nodes = data.clusters.map((c: any) => ({
+      id: c.id,
+      name: `${c.hub_name} (${c.size})`,
+      type: c.dominant_type,
+      score: c.size,
+      x: (c.x / 1000) * w * 0.9 + w * 0.05,
+      y: (c.y / 1000) * h * 0.9 + h * 0.05,
+      vx: 0,
+      vy: 0,
+      radius: Math.max(8, Math.min(40, 8 + Math.sqrt(c.size) * 2)),
+      isCenter: false,
+      _clusterIndex: c.index,
+    }));
+
+    this.edges = (data.edges || []).map((e: any) => ({
+      source: e.source,
+      target: e.target,
+      type: "cluster_link",
+    }));
+
+    this.nodeMap = new Map(this.nodes.map((n) => [n.id, n]));
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.scale = 1;
+    this.simRunning = false;
+    this.draw();
+  }
+
+  async drillIntoCluster(clusterIndex: number): Promise<void> {
+    this.drawEmpty("Loading cluster detail...");
+    const data = await this.apiClient.clusterDetail(clusterIndex);
+    if (!data || data.nodes.length === 0) {
+      this.drawEmpty("Empty cluster");
+      return;
+    }
+
+    const w = this.canvas!.width;
+    const h = this.canvas!.height;
+
+    this.nodes = data.nodes.map((n: any) => ({
+      id: n.id,
+      name: n.name,
+      type: n.type,
+      score: n.degree,
+      x: (n.x / 1000) * w * 0.9 + w * 0.05,
+      y: (n.y / 1000) * h * 0.9 + h * 0.05,
+      vx: 0,
+      vy: 0,
+      radius: Math.max(4, Math.min(16, 4 + (n.degree || 0) * 0.1)),
+      isCenter: false,
+    }));
+
+    this.edges = data.edges;
+    this.nodeMap = new Map(this.nodes.map((n) => [n.id, n]));
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.scale = 1;
+    this.simRunning = false;
+    if (this.backBtn) this.backBtn.style.display = "inline-block";
+    this.draw();
   }
 
   async loadFullGraph(): Promise<void> {
@@ -467,7 +548,12 @@ export class MnemoGraphView extends ItemView {
     c.addEventListener("click", (e) => {
       const node = this.hitTest(e.offsetX, e.offsetY);
       if (node) {
-        this.openNote(node.id);
+        if ((node as any)._clusterIndex != null) {
+          // 클러스터 → 드릴다운
+          this.drillIntoCluster((node as any)._clusterIndex);
+        } else {
+          this.openNote(node.id);
+        }
       }
     });
 
