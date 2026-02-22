@@ -173,10 +173,10 @@ try:
         # pick non-date top pagerank entries
         pr_names = [n for n, _ in pr if not n.startswith("20")][:3]
 
-        hub_str = " 쨌 ".join(f"[[{n}]] ({d})" for n, d in hubs)
-        pr_str = " 쨌 ".join(f"[[{n}]]" for n in pr_names)
-        et_str = " 쨌 ".join(f"`{k}` {v:,}" for k, v in et.items())
-        edge_str = " 쨌 ".join(f"`{k}` {v:,}" for k, v in edge_t.items())
+        hub_str = " \u00b7 ".join(f"[[{n}]] ({d})" for n, d in hubs)
+        pr_str = " \u00b7 ".join(f"[[{n}]]" for n in pr_names)
+        et_str = " \u00b7 ".join(f"`{k}` {v:,}" for k, v in et.items())
+        edge_str = " \u00b7 ".join(f"`{k}` {v:,}" for k, v in edge_t.items())
         today = datetime.now().strftime("%Y-%m-%d")
 
         return (
@@ -187,7 +187,7 @@ try:
             f"| **Nodes** | {s['nodes']:,} |\n"
             f"| **Edges** | {s['edges']:,} |\n"
             f"| **Connected Components** | {s.get('weakly_connected_components', '?')} |\n"
-            f"| **Dangling Nodes** | {s.get('dangling_nodes', '?')} ??|\n"
+            f"| **Dangling Nodes** | {s.get('dangling_nodes', '?')} \u2705 |\n"
             f"| **Density** | {s.get('density', 0):.4f} |\n"
             f"\n"
             f"**Entity Types:**\n"
