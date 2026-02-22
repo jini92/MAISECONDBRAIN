@@ -18,64 +18,52 @@
 
 ## Quick Start
 
-### Installation
+### Option 1 — uvx (recommended, no install needed)
 
 ```bash
-# Core (graph + CLI)
+uvx --from mnemo-secondbrain mnemo start /path/to/your/vault
+```
+
+That's it. One command builds your knowledge graph and starts the API server.
+
+### Option 2 — pip
+
+```bash
 pip install mnemo-secondbrain
-
-# With API server
-pip install mnemo-secondbrain[api]
-
-# With sentence-transformers embeddings
-pip install mnemo-secondbrain[sbert]
-
-# Everything
-pip install mnemo-secondbrain[all]
+mnemo start /path/to/your/vault
 ```
 
-### Configuration
-
-Create a `config.yaml` (see `config.example.yaml`):
-
-```yaml
-vault_path: ~/Documents/MyVault
-embedding:
-  provider: sbert          # or "openai", "ollama"
-  model: all-MiniLM-L6-v2
-```
-
-Or use environment variables:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `MNEMO_VAULT_PATH` | Path to your Obsidian vault | `~/Documents/MyVault` |
-| `OPENAI_API_KEY` | OpenAI API key (if using OpenAI embeddings) | `sk-...` |
-
-### CLI Usage
+### Option 3 — Docker
 
 ```bash
-# Build the knowledge graph from your vault
-mnemo build
+docker run -p 7890:7890 -v /path/to/your/vault:/vault jini92/mnemo /vault
+```
 
-# Search your knowledge graph
-mnemo search "machine learning fundamentals"
+### Connect Obsidian Plugin
+
+1. Open Obsidian → **Settings** → **Community plugins** → search **Mnemo SecondBrain** → Install & Enable
+2. In the Mnemo plugin settings, set **Server URL** to `http://localhost:7890`
+3. Press `Ctrl+Shift+M` to search your knowledge graph
+
+---
+
+### Advanced Usage
+
+```bash
+# Build graph only (no server)
+mnemo build /path/to/your/vault
+
+# Start server only (after building)
+mnemo serve --port 7890
+
+# Query from CLI
+mnemo query "machine learning fundamentals"
 
 # Show graph statistics
 mnemo stats
-
-# Export graph
-mnemo export --format graphml
 ```
 
-### API Server
-
-```bash
-# Start the API server (requires mnemo-secondbrain[api])
-mnemo serve --host 0.0.0.0 --port 8000
-```
-
-Endpoints:
+### API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -83,10 +71,6 @@ Endpoints:
 | `GET` | `/api/graph/stats` | Graph statistics |
 | `GET` | `/api/graph/node/{id}` | Get node details |
 | `GET` | `/api/graph/neighbors/{id}` | Get node neighbors |
-
-### Obsidian Plugin
-
-The companion Obsidian plugin lives in `obsidian-plugin/`. See its README for installation instructions. It connects to the Mnemo API server for in-vault search and graph visualization.
 
 ## Architecture
 

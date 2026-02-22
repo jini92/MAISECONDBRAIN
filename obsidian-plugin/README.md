@@ -14,11 +14,28 @@ Personal knowledge graph with hybrid search (keyword + vector + graph) for your 
 
 ## Prerequisites
 
-This plugin requires a running **Mnemo API server**. Mnemo is a self-hosted knowledge graph engine.
+This plugin requires a running **Mnemo API server**. Start it with a single command — no cloning or manual setup needed.
 
-1. Clone the Mnemo repo: `git clone https://github.com/jini92/MAISECONDBRAIN.git`
-2. Install dependencies: `pip install -e .`
-3. Start the server: `python -m uvicorn src.api:app --host 127.0.0.1 --port 8000`
+**Option 1 — uvx (recommended, requires [uv](https://docs.astral.sh/uv/))**
+
+```bash
+uvx --from mnemo-secondbrain mnemo start /path/to/your/vault
+```
+
+**Option 2 — pip**
+
+```bash
+pip install mnemo-secondbrain
+mnemo start /path/to/your/vault
+```
+
+**Option 3 — Docker**
+
+```bash
+docker run -p 7890:7890 -v /path/to/your/vault:/vault jini92/mnemo /vault
+```
+
+The server starts at `http://localhost:7890`. Keep this terminal open while using the plugin.
 
 ## Installation
 

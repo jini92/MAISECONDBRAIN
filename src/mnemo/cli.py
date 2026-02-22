@@ -253,6 +253,69 @@ def serve(cache_dir: str, port: int, host: str):
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
+
+@main.command()
+@click.argument("vault_path")
+@click.option("--port", default=7890, help="서버 포트 (기본값: 7890)")
+@click.option("--host", default="127.0.0.1", help="바인드 주소")
+@click.option("--cache-dir", default=DEFAULT_CACHE_DIR, help="캐시 디렉토리")
+@click.option("--tag-edges", is_flag=True, help="태그 공유 엣지 포함")
+def start(vault_path: str, port: int, host: str, cache_dir: str, tag_edges: bool):
+    """볼트 빌드 + API 서버 시작 (원샷).
+
+    \b
+    uvx 사용:
+        uvx --from mnemo-secondbrain mnemo start ~/Documents/MyVault
+
+    pip 사용:
+        pip install mnemo-secondbrain
+        mnemo start ~/Documents/MyVault
+    """
+    from .api import app, load_state
+
+    console.print(f"\n[bold blue]🧠 Mnemo Start[/bold blue]")
+    console.print(f"  Vault: {vault_path}")
+
+    t0 = time.time()
+    console.print("  [dim]파싱 중..[/dim]", end="")
+    notes = parse_vault(vault_path)
+    t_parse = time.time() - t0
+    console.print(f"  ✓ {len(notes)}개 노트 파싱 ({t_parse:.1f}s)")
+
+    cache = BuildCache(cache_dir)
+    t1 = time.time()
+    console.print("  [dim]그래프 빌드 중..[/dim]", end="")
+    G = build_graph(notes, include_tag_edges=tag_edges)
+    stats = graph_stats(G)
+    t_build = time.time() - t1
+    console.print(f"  ✓ {G.number_of_nodes()} 노드, {G.number_of_edges()} 엣지 ({t_build:.1f}s)")
+
+    current_checksums = {n.key: n.checksum for n in notes}
+    cache.save_checksums(current_checksums)
+    cache.save_graph(G)
+    cache.save_stats(stats)
+
+    if not load_state(cache_dir):
+        console.print("[red]캐시 로드 실패.[/red]")
+        return
+
+    console.print(f"\n  [bold green]✓ 서버 시작[/bold green]: http://{host}:{port}")
+    console.print(f"  Obsidian → 설정 → 서버 URL → [cyan]http://{host}:{port}[/cyan] 입력\n")
+
+    import uvicorn
+    uvicorn.run(app, host=host, port=port, log_level="warning")
+
+
+def server_main() -> None:
+    """``mnemo-server`` 스크립트 엔트리포인트 (uvx 전용).
+
+    uvx --from mnemo-secondbrain mnemo-server ~/Documents/MyVault
+    """
+    import sys
+
+    sys.argv = ["mnemo", "start"] + sys.argv[1:]
+    main(standalone_mode=True)
+
 def _print_build_summary(stats: dict):
     """빌드 통계 요약 테이블 출력"""
     # 기본 정보

@@ -1,6 +1,6 @@
 [project]
 name = "mnemo-secondbrain"
-version = "0.2.0"
+version = "0.2.1"
 description = "Personal knowledge graph system for Obsidian vaults with hybrid search"
 readme = "README.md"
 license = "MIT"
@@ -22,17 +22,16 @@ dependencies = [
     "numpy>=1.24",
     "rich>=13.0",
     "click>=8.0",
+    "fastapi>=0.100",
+    "uvicorn>=0.20",
 ]
 
 [project.optional-dependencies]
-api = ["fastapi>=0.100", "uvicorn>=0.20"]
 embeddings = ["openai>=1.0"]
 local = ["ollama>=0.1"]
 sbert = ["sentence-transformers>=2.2"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "build"]
 all = [
-    "fastapi>=0.100",
-    "uvicorn>=0.20",
     "openai>=1.0",
     "sentence-transformers>=2.2",
 ]
@@ -44,6 +43,7 @@ Issues = "https://github.com/jini92/MAISECONDBRAIN/issues"
 
 [project.scripts]
 mnemo = "mnemo.cli:main"
+mnemo-server = "mnemo.cli:server_main"
 
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
