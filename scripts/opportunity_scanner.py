@@ -55,7 +55,7 @@ PROJECT_KEYWORDS: dict[str, list[str]] = {
     "MAISTAR7": ["인력매칭", "채용", "한국기업", "베트남인력", "Zalo", "구인구직"],
     "MAICON": ["로컬서비스", "예약", "베트남", "미용실", "네일", "서비스예약"],
     "MAITUTOR": ["어학교육", "한국어", "베트남어", "TOPIK", "언어학습", "AI튜터"],
-    "MAIBOTALKS": ["음성대화", "TTS", "STT", "음성AI", "대화형앱", "OpenClaw"],
+    "MAIBOTALKS": ["음성대화", "TTS", "STT", "음성AI", "대화형앱", "OpenClaw", "음성인식", "speech"],
     "MAITOK": ["TikTok", "댓글", "감성분석", "대댓글", "소셜커머스", "숏폼"],
     "MAISECONDBRAIN": ["세컨드브레인", "지식그래프", "GraphRAG", "Obsidian", "Mnemo", "온톨로지"],
     "MAIPatent": ["특허", "IP", "지재권", "patent", "발명", "출원"],
@@ -83,9 +83,22 @@ def scan_external_knowledge(days: int = 7) -> list[dict]:
             continue
         seen_titles.add(title)
 
-        # 프로젝트 연관성 매칭
+        # 프로젝트 연관성 매칭 — frontmatter project를 우선, 키워드 매칭으로 보완
         matched_projects = []
+        # frontmatter의 project 필드 (가장 관련도 높음)
+        import re as _re_fm
+        fm_match = _re_fm.search(r'^project:\s*(.+)$', content, _re_fm.MULTILINE)
+        if fm_match:
+            fm_proj = fm_match.group(1).strip().upper()
+            for proj in PROJECT_KEYWORDS:
+                if proj.upper() == fm_proj:
+                    matched_projects.append(proj)
+                    break
+
+        # 키워드 매칭 (frontmatter project 제외)
         for proj, keywords in PROJECT_KEYWORDS.items():
+            if proj in matched_projects:
+                continue
             for kw in keywords:
                 if kw.lower() in content.lower() or kw.lower() in title.lower():
                     matched_projects.append(proj)
@@ -231,6 +244,27 @@ def format_discord_summary(opportunities: list[dict], top_k: int = 3) -> str:
     return "\n".join(lines)
 
 
+def _run_dashboard_sync():
+    """Obsidian 대시보드 AUTO 블록 동기화."""
+    print("\n🔄 대시보드 동기화 중...")
+    import subprocess
+    env = os.environ.copy()
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_DIR / "sync_dashboard_decisions.py")],
+        cwd=str(SCRIPT_DIR.parent),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        print(f"✅ 대시보드 동기화 완료")
+        for line in result.stdout.strip().split("\n"):
+            if line.strip():
+                print(f"  {line}")
+    else:
+        print(f"⚠️ 대시보드 동기화 실패: {result.stderr[:200]}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="MAI Universe 기회 탐지 스캐너")
     parser.add_argument("--scan", action="store_true", default=True, help="외부 지식 스캔")
@@ -239,6 +273,7 @@ def main():
     parser.add_argument("--format", choices=["json", "markdown", "discord"], default="markdown")
     parser.add_argument("--save-obsidian", action="store_true", help="Obsidian 노트로 저장")
     parser.add_argument("--days", type=int, default=7, help="최근 N일 스캔")
+    parser.add_argument("--sync-dashboard", action="store_true", help="Obsidian 대시보드 AUTO 블록 동기화")
     args = parser.parse_args()
 
     project_scores = None
@@ -261,10 +296,12 @@ def main():
                     print(f"  {dim} ({bd.score:.0f}): {', '.join(bd.reasons)}")
                 print()
 
-        if not args.scan or args.score_existing:
+        if not args.scan:
             if args.save_obsidian:
                 p = save_obsidian_report([], project_scores)
                 print(f"\n✅ Obsidian 저장: {p}")
+            if args.sync_dashboard:
+                _run_dashboard_sync()
             return
 
     # 기회 스캔
@@ -287,6 +324,9 @@ def main():
     if args.save_obsidian:
         p = save_obsidian_report(opportunities[:args.top_k], project_scores)
         print(f"\n✅ Obsidian 저장: {p}")
+
+    if args.sync_dashboard:
+        _run_dashboard_sync()
 
 
 if __name__ == "__main__":

@@ -158,19 +158,49 @@ try:
 except Exception as e:
     print(f"  Collection error (skipped): {e}")
 
-# 8. Dashboard sync (Obsidian)
-print("\n[9/9] Syncing dashboards...")
+# 8. Opportunity scanning (Stage 2: DISCOVER) — ⚠️ 대시보드 싱크 전에 실행해야 함
+print("\n[9/10] Scanning opportunities...")
+opportunity_results = {"scanned": 0, "golden": 0, "top": []}
+try:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from opportunity_scanner import scan_external_knowledge, save_obsidian_report
+    from mnemo.opportunity_scorer import score_all_projects, format_scores_markdown
+
+    # 기존 프로젝트 재스코어링
+    project_scores = score_all_projects()
+
+    # 외부 지식에서 기회 탐지 (최근 7일)
+    opportunities = scan_external_knowledge(days=7)
+    opportunity_results["scanned"] = len(opportunities)
+
+    # 황금지대 기회 필터링
+    golden = [o for o in opportunities if "황금" in o["score"].get("quadrant", "")]
+    opportunity_results["golden"] = len(golden)
+    opportunity_results["top"] = opportunities[:5]
+
+    # Obsidian 리포트 저장
+    if opportunities or project_scores:
+        report_path = save_obsidian_report(opportunities[:10], project_scores)
+        print(f"  {len(opportunities)} opportunities found ({len(golden)} golden)")
+        print(f"  Report: {report_path.name}")
+    else:
+        print("  No new opportunities detected")
+
+except Exception as e:
+    print(f"  Opportunity scan error (skipped): {e}")
+
+# 9. Dashboard sync (Obsidian) — opportunity_results 사용 가능
+print("\n[10/10] Syncing dashboards...")
 try:
     from datetime import datetime
     import re as _re
 
     def _build_mnemo_block(s):
-        """stats dict ??markdown block"""
+        """stats dict → markdown block"""
         et = s.get("entity_types", {})
         edge_t = s.get("edge_types", {})
         hubs = s.get("top_hubs", [])[:4]
         pr = s.get("top_pagerank", [])
-        # pick non-date top pagerank entries
         pr_names = [n for n, _ in pr if not n.startswith("20")][:3]
 
         hub_str = " \u00b7 ".join(f"[[{n}]] ({d})" for n, d in hubs)
@@ -219,7 +249,7 @@ try:
         if n > 0 and new_text != text:
             dp.write_text(new_text, encoding="utf-8")
             synced += 1
-    print(f"  {synced} dashboard(s) updated")
+    print(f"  {synced} dashboard(s) updated (mnemo-stats)")
 
     # ── 지니님 판단 섹션 자동 싱크 ──
     print("  Syncing decision sections...")
@@ -255,7 +285,7 @@ try:
     except Exception as e:
         print(f"    Score sync error: {e}")
 
-    # 2) 지니님 판단 필요 블록 (🔴 피하기 + 낮은 점수 + 기회)
+    # 2) 지니님 판단 필요 블록 (🔴 피하기 + 낮은 점수 + 황금 기회)
     try:
         action_lines = [f"> **Last updated:** {today}\n"]
         red_projects = [s for s in _all_scores if "피하기" in s.quadrant]
@@ -338,37 +368,6 @@ try:
     print(f"  Total synced: {synced} section(s)")
 except Exception as e:
     print(f"  Dashboard sync error (skipped): {e}")
-
-# 10. Opportunity scanning (Stage 2: DISCOVER)
-print("\n[10/10] Scanning opportunities...")
-opportunity_results = {"scanned": 0, "golden": 0, "top": []}
-try:
-    sys.path.insert(0, str(Path(__file__).parent))
-    from opportunity_scanner import scan_external_knowledge, save_obsidian_report
-    from mnemo.opportunity_scorer import score_all_projects, format_scores_markdown
-
-    # 기존 프로젝트 재스코어링
-    project_scores = score_all_projects()
-
-    # 외부 지식에서 기회 탐지 (최근 7일)
-    opportunities = scan_external_knowledge(days=7)
-    opportunity_results["scanned"] = len(opportunities)
-
-    # 황금지대 기회 필터링
-    golden = [o for o in opportunities if "황금" in o["score"].get("quadrant", "")]
-    opportunity_results["golden"] = len(golden)
-    opportunity_results["top"] = opportunities[:5]
-
-    # Obsidian 리포트 저장
-    if opportunities or project_scores:
-        report_path = save_obsidian_report(opportunities[:10], project_scores)
-        print(f"  {len(opportunities)} opportunities found ({len(golden)} golden)")
-        print(f"  Report: {report_path.name}")
-    else:
-        print("  No new opportunities detected")
-
-except Exception as e:
-    print(f"  Opportunity scan error (skipped): {e}")
 
 # Summary
 elapsed = time.time() - t_total
