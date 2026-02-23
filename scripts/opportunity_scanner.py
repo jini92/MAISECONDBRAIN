@@ -42,16 +42,25 @@ EXTERNAL_KNOWLEDGE_DIR = VAULT / "03.RESOURCES" / "외부지식"
 DAILY_DIR = VAULT / "00.DAILY"
 
 # 프로젝트 키워드 맵 — 외부 지식과 프로젝트 매칭용
+# ⚠️ MEMORY.md의 16개 프로젝트와 동기화 유지할 것
 PROJECT_KEYWORDS: dict[str, list[str]] = {
-    "MAIBOT": ["AI 에이전트", "봇", "자동화", "LLM", "Discord", "assistant", "agent"],
-    "MAITCAD": ["CAD", "엔지니어링", "도면", "P&ID", "설계", "배관"],
-    "MAIPnID": ["P&ID", "배관", "계장", "도면", "SBOM", "설비"],
-    "MAIAX": ["산업", "데이터", "분석", "모니터링", "IoT", "실시간"],
-    "MAIOSS": ["오픈소스", "보안", "스캐너", "SCA", "SBOM", "취약점", "vulnerability"],
+    "MAIBOT": ["AI 에이전트", "봇", "자동화", "LLM", "Discord", "assistant", "agent", "OpenClaw"],
+    "MAITCAD": ["CAD", "엔지니어링", "도면", "설계", "3D 모델링", "AutoCAD"],
+    "MAIPnID": ["P&ID", "배관", "계장", "도면", "SBOM", "설비", "플랜트"],
+    "MAIAX": ["산업", "스마트제조", "디지털트윈", "모니터링", "IoT", "실시간", "발효", "AX"],
+    "MAIOSS": ["오픈소스", "보안", "스캐너", "SCA", "SBOM", "취약점", "vulnerability", "CVE", "CRA"],
     "MAITB": ["기술블로그", "콘텐츠", "SEO", "마크다운", "블로그"],
-    "MAITHINK": ["세컨드브레인", "지식그래프", "Obsidian", "노트", "RAG", "PKM"],
-    "MAIBEAUTY": ["화장품", "뷰티", "베트남", "K뷰티", "TikTok", "커머스", "숏폼"],
-    "MAISTAR7": ["교육", "학습", "튜터", "에듀테크", "개인화"],
+    "MAITHINK": ["세컨드브레인", "지식그래프", "Obsidian", "노트", "RAG", "PKM", "추론"],
+    "MAIBEAUTY": ["화장품", "뷰티", "베트남", "K뷰티", "커머스", "숏폼", "화장"],
+    "MAISTAR7": ["인력매칭", "채용", "한국기업", "베트남인력", "Zalo", "구인구직"],
+    "MAICON": ["로컬서비스", "예약", "베트남", "미용실", "네일", "서비스예약"],
+    "MAITUTOR": ["어학교육", "한국어", "베트남어", "TOPIK", "언어학습", "AI튜터"],
+    "MAIBOTALKS": ["음성대화", "TTS", "STT", "음성AI", "대화형앱", "OpenClaw"],
+    "MAITOK": ["TikTok", "댓글", "감성분석", "대댓글", "소셜커머스", "숏폼"],
+    "MAISECONDBRAIN": ["세컨드브레인", "지식그래프", "GraphRAG", "Obsidian", "Mnemo", "온톨로지"],
+    "MAIPatent": ["특허", "IP", "지재권", "patent", "발명", "출원"],
+    "MAITalkCart": ["대화형커머스", "쇼핑", "AI커머스", "대화주문", "conversational"],
+    "MAIUPbit": ["디지털자산", "암호화폐", "거래", "업비트", "비트코인", "투자분석"],
 }
 
 
