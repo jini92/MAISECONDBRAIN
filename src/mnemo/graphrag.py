@@ -65,12 +65,26 @@ def _build_context_prompt(
     graph_context: list[dict],
     notes_content: dict[str, str],
     max_context_chars: int = 12000,
+    query_type: str = "factual",
 ) -> str:
-    """LLM에 전달할 컨텍스트 프롬프트 구성"""
-    parts = []
-    parts.append("다음은 사용자의 지식 그래프에서 검색된 관련 노트입니다.\n")
+    """LLM에 전달할 컨텍스트 프롬프트 구성.
 
-    # 관련 노트 내용
+    Args:
+        query_type: factual/relational/exploratory — 답변 스타일 조절
+    """
+    parts = []
+
+    # 시스템 지시 (쿼리 타입별)
+    if query_type == "relational":
+        parts.append("당신은 지식 그래프 분석 전문가입니다. 노트 간 관계, 인물 연결, 프로젝트 시너지를 중심으로 답변하세요.\n")
+    elif query_type == "exploratory":
+        parts.append("당신은 지식 통합 분석가입니다. 여러 노트의 내용을 종합하여 트렌드, 비교, 전략적 인사이트를 도출하세요.\n")
+    else:
+        parts.append("당신은 개인 지식 베이스 검색 전문가입니다. 검색된 노트에서 정확한 사실을 추출하여 답변하세요.\n")
+
+    parts.append("## 검색된 관련 노트\n")
+
+    # 관련 노트 내용 (frontmatter 제거 후 핵심 부분)
     char_count = 0
     for src in sources:
         name = src["name"]
@@ -79,28 +93,47 @@ def _build_context_prompt(
         if not content:
             continue
 
+        # frontmatter 제거
+        if content.startswith("---"):
+            end = content.find("---", 3)
+            if end != -1:
+                content = content[end + 3:].lstrip("\n")
+
         # 길이 제한
         remaining = max_context_chars - char_count
         if remaining <= 200:
             break
 
         truncated = content[:remaining]
-        parts.append(f"---\n### [{name}] (type: {src.get('entity_type', '?')})")
+        etype = src.get('entity_type', '?')
+        score = src.get('combined_score', 0)
+        parts.append(f"### [{name}] (type: {etype}, relevance: {score:.3f})")
         parts.append(truncated)
+        parts.append("")
         char_count += len(truncated)
 
-    # 그래프 관계 정보
+    # 그래프 관계 정보 (의미적 엣지 우선)
     if graph_context:
-        parts.append("\n---\n### 그래프 관계:")
-        for ctx in graph_context[:10]:
-            conns = ", ".join(
-                f"{c['target']}({c['type']})" for c in ctx.get("connections", [])[:5]
-            )
-            if conns:
-                parts.append(f"- {ctx['name']} → {conns}")
+        parts.append("## 그래프 관계 (노트 간 연결)")
+        semantic_types = {"uses", "derived_from", "alternatives", "supports", "contradicts", "participants"}
+        for ctx in graph_context[:15]:
+            conns = ctx.get("connections", [])
+            # 의미적 관계 우선, wiki_link/related 후순위
+            semantic = [c for c in conns if c.get("type") in semantic_types]
+            other = [c for c in conns if c.get("type") not in semantic_types]
+            display = semantic[:5] + other[:3]
+            if display:
+                conn_str = ", ".join(f"{c['target']}({c['type']})" for c in display)
+                parts.append(f"- {ctx['name']} → {conn_str}")
 
-    parts.append(f"\n---\n### 질문: {question}")
-    parts.append("\n위 노트들의 내용과 관계를 바탕으로 질문에 답해주세요. 답변에 참고한 노트를 [노트명]으로 인용해주세요.")
+    # 질문 + 답변 가이드
+    parts.append(f"\n## 질문\n{question}")
+    parts.append("""
+## 답변 규칙
+1. 위 노트들의 내용과 관계를 바탕으로 답변하세요
+2. 참고한 노트를 [노트명]으로 인용하세요
+3. 노트에 없는 정보를 추측하지 마세요
+4. 핵심을 먼저, 세부사항은 후순위로""")
 
     return "\n".join(parts)
 
@@ -168,7 +201,14 @@ def query(
     # 6. LLM 답변 생성
     answer = ""
     if llm_fn is not None:
-        prompt = _build_context_prompt(question, sources, graph_context, notes_content)
+        # 쿼리 타입 분류 (동적 프롬프트)
+        try:
+            from .query_classifier import classify_query
+            q_type = classify_query(question)
+        except ImportError:
+            q_type = "factual"
+        prompt = _build_context_prompt(question, sources, graph_context, notes_content,
+                                       query_type=q_type)
         answer = llm_fn(prompt)
     else:
         # LLM 없으면 소스 목록만 반환

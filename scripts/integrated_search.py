@@ -114,8 +114,13 @@ def _load_vault_context(cache_dir: str | None = None):
     return G, embeddings, notes_content, query_embedding_fn
 
 
-def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> list[dict]:
-    """Mnemo 볼트 검색 (하이브리드: 키워드 + 벡터 + 그래프)."""
+def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None,
+                 dynamic_weights: bool = False) -> list[dict]:
+    """Mnemo 볼트 검색 (하이브리드: 키워드 + 벡터 + 그래프).
+
+    Args:
+        dynamic_weights: True면 쿼리 타입별 가중치 자동 조절
+    """
     from mnemo.hybrid_search import hybrid_search
 
     G, embeddings, notes_content, embed_fn = _load_vault_context(cache_dir)
@@ -124,10 +129,20 @@ def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> li
 
     query_embedding = embed_fn(query) if embed_fn else None
 
+    # 동적 가중치
+    kw_w, vec_w, graph_w = 0.5, 0.3, 0.2
+    if dynamic_weights:
+        try:
+            from mnemo.query_classifier import classify_and_weight
+            q_type, kw_w, vec_w, graph_w = classify_and_weight(query)
+        except ImportError:
+            pass
+
     results = hybrid_search(
         query=query, G=G, embeddings=embeddings,
         notes_content=notes_content, query_embedding=query_embedding,
         top_k=top_k,
+        keyword_weight=kw_w, vector_weight=vec_w, graph_weight=graph_w,
     )
 
     output = []
@@ -193,10 +208,11 @@ def graphrag_query(query: str, top_k: int = 5, cache_dir: str | None = None,
     }
 
 
-def integrated_search(query: str, top_k: int = 5, fmt: str = "json"):
+def integrated_search(query: str, top_k: int = 5, fmt: str = "json",
+                      dynamic_weights: bool = False):
     """memory 우선 + 볼트 보강, 중복 제거."""
     memory_results = search_memory_files(query, top_k=top_k)
-    vault_results = search_vault(query, top_k=top_k)
+    vault_results = search_vault(query, top_k=top_k, dynamic_weights=dynamic_weights)
 
     # 중복 제거 (memory 우선)
     seen_names = {r["name"].lower() for r in memory_results}
@@ -245,6 +261,8 @@ def main():
     parser.add_argument("--format", choices=["json", "text"], default="json")
     parser.add_argument("--graphrag", action="store_true", help="GraphRAG 모드 (LLM 답변 생성)")
     parser.add_argument("--no-llm", action="store_true", help="GraphRAG에서 LLM 없이 소스만 반환")
+    parser.add_argument("--dynamic-weights", action="store_true",
+                        help="쿼리 타입별 동적 가중치 (factual/relational/exploratory)")
     args = parser.parse_args()
 
     if args.graphrag:
@@ -259,7 +277,8 @@ def main():
                 print(f"  [{s.get('combined_score', 0):.3f}] {s['name']} ({s.get('entity_type', '?')})")
             print(f"\nExpanded nodes: {result['expanded_nodes']}")
     else:
-        integrated_search(args.query, args.top_k, args.format)
+        integrated_search(args.query, args.top_k, args.format,
+                          dynamic_weights=args.dynamic_weights)
 
 
 if __name__ == "__main__":
