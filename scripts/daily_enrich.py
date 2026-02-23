@@ -220,6 +220,122 @@ try:
             dp.write_text(new_text, encoding="utf-8")
             synced += 1
     print(f"  {synced} dashboard(s) updated")
+
+    # ── 지니님 판단 섹션 자동 싱크 ──
+    print("  Syncing decision sections...")
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 1) 프로젝트 스코어링 블록
+    try:
+        from mnemo.opportunity_scorer import score_all_projects as _score_all
+        _all_scores = _score_all()
+        score_lines = [f"> **Last updated:** {today}\n"]
+        score_lines.append("| 사분면 | 프로젝트 | 기여 | 수익 | 시너지 | 실현 | 종합 |")
+        score_lines.append("|--------|----------|------|------|--------|------|------|")
+        for _s in _all_scores:
+            score_lines.append(
+                f"| {_s.quadrant} | **{_s.name}** | {_s.contribution.score:.0f} "
+                f"| {_s.revenue.score:.0f} | {_s.synergy.score:.0f} "
+                f"| {_s.feasibility.score:.0f} | **{_s.total:.1f}** |"
+            )
+        scores_block = "\n".join(score_lines)
+
+        SCORES_RE = _re.compile(
+            r"(<!-- AUTO:opportunity-scores:START -->)\n.*?\n(<!-- AUTO:opportunity-scores:END -->)",
+            _re.DOTALL,
+        )
+        for dp in DASHBOARD_FILES:
+            if not dp.exists():
+                continue
+            text = dp.read_text(encoding="utf-8")
+            new_text, n = SCORES_RE.subn(rf"\1\n{scores_block}\n\2", text)
+            if n > 0 and new_text != text:
+                dp.write_text(new_text, encoding="utf-8")
+                synced += 1
+    except Exception as e:
+        print(f"    Score sync error: {e}")
+
+    # 2) 지니님 판단 필요 블록 (🔴 피하기 + 낮은 점수 + 기회)
+    try:
+        action_lines = [f"> **Last updated:** {today}\n"]
+        red_projects = [s for s in _all_scores if "피하기" in s.quadrant]
+        low_projects = [s for s in _all_scores if s.total < 5.0 and "피하기" not in s.quadrant]
+
+        if red_projects:
+            action_lines.append("### 🔴 방향 재검토 필요")
+            for _s in red_projects:
+                action_lines.append(f"- **{_s.name}** (종합 {_s.total:.1f}) — 기여도·수익성 모두 낮음")
+            action_lines.append("")
+
+        if low_projects:
+            action_lines.append("### ⚠️ 낮은 스코어 (5.0 미만)")
+            for _s in low_projects:
+                action_lines.append(f"- **{_s.name}** ({_s.quadrant}, 종합 {_s.total:.1f})")
+            action_lines.append("")
+
+        if opportunity_results.get("golden", 0) > 0:
+            action_lines.append(f"### 🟢 황금지대 기회 발견 ({opportunity_results['golden']}건)")
+            for _opp in opportunity_results.get("top", [])[:3]:
+                _os = _opp.get("score", {})
+                if "황금" in _os.get("quadrant", ""):
+                    action_lines.append(
+                        f"- **{_opp['title'][:40]}** (종합 {_os['total_score']:.1f}) "
+                        f"→ {', '.join(_opp.get('matched_projects', [])[:3])}"
+                    )
+            action_lines.append("")
+
+        if not red_projects and not low_projects and opportunity_results.get("golden", 0) == 0:
+            action_lines.append("✅ 현재 즉시 판단이 필요한 항목이 없습니다.")
+
+        action_block = "\n".join(action_lines)
+        ACTION_RE = _re.compile(
+            r"(<!-- AUTO:action-required:START -->)\n.*?\n(<!-- AUTO:action-required:END -->)",
+            _re.DOTALL,
+        )
+        for dp in DASHBOARD_FILES:
+            if not dp.exists():
+                continue
+            text = dp.read_text(encoding="utf-8")
+            new_text, n = ACTION_RE.subn(rf"\1\n{action_block}\n\2", text)
+            if n > 0 and new_text != text:
+                dp.write_text(new_text, encoding="utf-8")
+                synced += 1
+    except Exception as e:
+        print(f"    Action sync error: {e}")
+
+    # 3) 최근 기회 탐지 블록 (Dashboard.md에만)
+    try:
+        opp_lines = [f"> **Last updated:** {today}\n"]
+        top_opps = opportunity_results.get("top", [])[:5]
+        if top_opps:
+            opp_lines.append("| 기회 | 사분면 | 종합 | 연관 프로젝트 |")
+            opp_lines.append("|------|--------|------|-------------|")
+            for _opp in top_opps:
+                _os = _opp.get("score", {})
+                projs = ", ".join(_opp.get("matched_projects", [])[:3])
+                opp_lines.append(
+                    f"| {_opp['title'][:35]} | {_os.get('quadrant', '?')} "
+                    f"| {_os.get('total_score', 0):.1f} | {projs} |"
+                )
+        else:
+            opp_lines.append("이번 주기에 새로운 기회가 탐지되지 않았습니다.")
+
+        opp_block = "\n".join(opp_lines)
+        OPP_RE = _re.compile(
+            r"(<!-- AUTO:recent-opportunities:START -->)\n.*?\n(<!-- AUTO:recent-opportunities:END -->)",
+            _re.DOTALL,
+        )
+        dashboard_only = Path(VAULT) / "TEMPLATES" / "Dashboard.md"
+        if dashboard_only.exists():
+            text = dashboard_only.read_text(encoding="utf-8")
+            new_text, n = OPP_RE.subn(rf"\1\n{opp_block}\n\2", text)
+            if n > 0 and new_text != text:
+                dashboard_only.write_text(new_text, encoding="utf-8")
+                synced += 1
+    except Exception as e:
+        print(f"    Opportunity sync error: {e}")
+
+    print(f"  Total synced: {synced} section(s)")
 except Exception as e:
     print(f"  Dashboard sync error (skipped): {e}")
 
