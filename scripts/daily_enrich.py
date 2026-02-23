@@ -223,11 +223,44 @@ try:
 except Exception as e:
     print(f"  Dashboard sync error (skipped): {e}")
 
+# 10. Opportunity scanning (Stage 2: DISCOVER)
+print("\n[10/10] Scanning opportunities...")
+opportunity_results = {"scanned": 0, "golden": 0, "top": []}
+try:
+    sys.path.insert(0, str(Path(__file__).parent))
+    from opportunity_scanner import scan_external_knowledge, save_obsidian_report
+    from mnemo.opportunity_scorer import score_all_projects, format_scores_markdown
+
+    # 기존 프로젝트 재스코어링
+    project_scores = score_all_projects()
+
+    # 외부 지식에서 기회 탐지 (최근 7일)
+    opportunities = scan_external_knowledge(days=7)
+    opportunity_results["scanned"] = len(opportunities)
+
+    # 황금지대 기회 필터링
+    golden = [o for o in opportunities if "황금" in o["score"].get("quadrant", "")]
+    opportunity_results["golden"] = len(golden)
+    opportunity_results["top"] = opportunities[:5]
+
+    # Obsidian 리포트 저장
+    if opportunities or project_scores:
+        report_path = save_obsidian_report(opportunities[:10], project_scores)
+        print(f"  {len(opportunities)} opportunities found ({len(golden)} golden)")
+        print(f"  Report: {report_path.name}")
+    else:
+        print("  No new opportunities detected")
+
+except Exception as e:
+    print(f"  Opportunity scan error (skipped): {e}")
+
 # Summary
 elapsed = time.time() - t_total
 print(f"\n{'=' * 50}")
-print(f"??Complete in {elapsed:.1f}s")
+print(f"\u2705 Complete in {elapsed:.1f}s")
 print(f"  struct: {applied_struct} | related: {applied_rel} | content: {applied_content}")
 print(f"  graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+if opportunity_results["scanned"] > 0:
+    print(f"  opportunities: {opportunity_results['scanned']} found, {opportunity_results['golden']} golden")
 print(f"{'=' * 50}")
 
