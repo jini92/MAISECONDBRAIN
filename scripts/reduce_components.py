@@ -129,17 +129,32 @@ def strategy_remove_garbage_nodes(G):
     IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".pdf"}
     to_remove = []
     for n, d in G.nodes(data=True):
-        if "entity_type" not in d:  # dangling node
-            name = n.lower()
-            # 이미지 참조
-            if any(name.endswith(ext) for ext in IMAGE_EXTS):
+        name = n
+        name_lower = name.lower()
+        is_dangling = "entity_type" not in d or d.get("dangling")
+
+        # 이미지 참조 (dangling only)
+        if is_dangling and any(name_lower.endswith(ext) for ext in IMAGE_EXTS):
+            to_remove.append(n)
+            continue
+
+        # 대괄호로 시작하는 깨진 참조 (예: [Meta, [출처)
+        if name.startswith("[") or name.startswith("[["):
+            to_remove.append(n)
+            continue
+
+        # 경로 중복 노드 (예: JINI_SYNC/JINI_SYNC/...)
+        if "JINI_SYNC/JINI_SYNC/" in name:
+            to_remove.append(n)
+            continue
+
+        # 코드/기호 조각 (노드 이름에 특수문자가 많으면)
+        if is_dangling:
+            special = sum(1 for c in name if c in '<>{}[]()=|&;,"\'\n\t')
+            if special > 3 or len(name) > 200:
                 to_remove.append(n)
                 continue
-            # 코드/기호 조각 (노드 이름에 특수문자가 많으면)
-            special = sum(1 for c in n if c in '<>{}[]()=|&;,"\'\n\t')
-            if special > 3 or len(n) > 200:
-                to_remove.append(n)
-                continue
+
     G.remove_nodes_from(to_remove)
     return len(to_remove)
 

@@ -116,7 +116,45 @@ def build_graph(
                 if target_key not in G:
                     G.add_node(target_key, name=target, entity_type="unknown", dangling=True)
 
-    # 4단계: 태그 공유 엣지 (선택)
+    # 4단계: 의미적 관계 추출 (본문 패턴 기반)
+    SEMANTIC_PATTERNS: list[tuple[str, str]] = [
+        # (정규식, 관계타입) — 본문에서 [[노트]]와 함께 패턴 매칭
+        (r"(?:사용|활용|이용)(?:하|한|했)", "uses"),
+        (r"(?:기반|based on|위에)", "uses"),
+        (r"(?:참고|참조|inspired|영감)", "derived_from"),
+        (r"(?:대안|대체|alternative|vs\.?|versus)", "alternatives"),
+        (r"(?:지원|support|호환)", "supports"),
+        (r"(?:반대|충돌|conflict|contradict)", "contradicts"),
+    ]
+
+    import re as _re_sem
+    for note in notes:
+        body_lower = note.body.lower()
+        for link in note.wiki_links:
+            target_key = link_resolver.get(link, link)
+            if target_key == note.key:
+                continue
+            # 링크 주변 문맥 확인 (링크 전후 50자)
+            link_pattern = _re_sem.escape(link)
+            for match in _re_sem.finditer(rf"\[\[{link_pattern}[^\]]*\]\]", note.body, _re_sem.IGNORECASE):
+                start = max(0, match.start() - 50)
+                end = min(len(note.body), match.end() + 50)
+                context = note.body[start:end].lower()
+
+                for sem_pattern, rel_type in SEMANTIC_PATTERNS:
+                    if _re_sem.search(sem_pattern, context):
+                        if not G.has_edge(note.key, target_key) or \
+                           G.edges[note.key, target_key].get("type") == "wiki_link":
+                            G.add_edge(
+                                note.key,
+                                target_key,
+                                type=rel_type,
+                                weight=EDGE_WEIGHTS.get(rel_type, 0.5),
+                                auto_semantic=True,
+                            )
+                        break  # 첫 번째 매칭되는 관계만
+
+    # 5단계: 태그 공유 엣지 (선택)
     if include_tag_edges:
         tag_notes: dict[str, list[str]] = {}
         for note in notes:

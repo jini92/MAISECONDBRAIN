@@ -37,25 +37,37 @@ PROJECT_MAP = {
     "MAITOK": "MAITOK",
     "MAISECONDBRAIN": "MAISECONDBRAIN",
     "MAIPnID": "MAIPnID",
+    "MAIPatent": "MAIPatent",
+    "MAITalkCart": "MAITalkCart",
+    "MAITHINK": "MAITHINK",
+    "MAITCAD": "MAITCAD",
+    "MAITB": "MAITB",
+    "MAIUPbit": "MAIUPbit",
     "C&E": "MAIAX",
     "삼성엔지니어링": "MAIAX",
 }
 
-# 타입 추론 규칙
+# 타입 추론 규칙 (v2 — 온톨로지 엔티티 타입에 매핑)
 TYPE_RULES = [
     # (패턴, 타입)
-    (r"^\d{4}-\d{2}-\d{2}", "event"),          # 날짜로 시작 → 이벤트/일지
-    (r"^A\d{3}-", "analysis"),                   # A001- → 분석 문서
-    (r"^D\d{3}-", "design"),                     # D001- → 설계 문서
-    (r"^I\d{3}-", "implementation"),             # I001- → 구현 문서
-    (r"^T\d{3}-", "test"),                       # T001- → 테스트 문서
-    (r"_개발현황", "devlog"),                     # 개발현황 → 개발일지
-    (r"_디버깅|_Debugging", "devlog"),
-    (r"미팅|회의|meeting", "meeting"),
-    (r"분석|Analysis|Research", "analysis"),
-    (r"설계|Design|Architecture", "design"),
-    (r"브리핑|리포트|Report", "report"),
-    (r"가이드|Guide|Tutorial", "guide"),
+    (r"^\d{4}-\d{2}-\d{2}", "event"),             # 날짜로 시작 → 이벤트
+    (r"^A\d{3}-", "source"),                       # A001- → 분석 문서 (source)
+    (r"^D\d{3}-", "concept"),                      # D001- → 설계 문서 (concept)
+    (r"^I\d{3}-", "note"),                         # I001- → 구현 문서
+    (r"^T\d{3}-", "note"),                         # T001- → 테스트 문서
+    (r"Lessons?_?Learned|TIL|회고", "insight"),     # 교훈/회고
+    (r"_개발현황", "event"),                        # 개발현황 → event
+    (r"_디버깅|_Debugging", "event"),
+    (r"미팅|회의|meeting", "event"),
+    (r"분석|Analysis|Research", "source"),
+    (r"설계|Design|Architecture", "concept"),
+    (r"브리핑|리포트|Report", "event"),
+    (r"가이드|Guide|Tutorial", "source"),
+    (r"설정|설치|Setup|Install|Config", "tool"),    # 도구 설정
+    (r"_?api_?key|_?token|credential", "tool"),    # 인증 키 관련
+    (r"전략|Strategy|Methodology", "concept"),      # 전략 문서
+    (r"사업계획|Business|PRD", "concept"),           # 사업 계획
+    (r"결정|선택|마이그레이션|전환|ADR", "decision"), # 의사결정
 ]
 
 # 태그 정규화
