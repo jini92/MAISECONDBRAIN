@@ -139,7 +139,7 @@ from mnemo.embedder import embed_notes, EmbeddingCache
 emb_cache = EmbeddingCache(CACHE_DIR)
 existing = emb_cache.load()
 try:
-    embeddings = embed_notes(notes, provider="ollama", model="nomic-embed-text", existing=existing)
+    embeddings = embed_notes(notes, provider="ollama", existing=existing)
     emb_cache.save(embeddings)
     new_count = len(embeddings) - len(existing)
     print(f"  {len(embeddings)} total ({new_count} new)")
@@ -378,4 +378,5 @@ print(f"  graph: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
 if opportunity_results["scanned"] > 0:
     print(f"  opportunities: {opportunity_results['scanned']} found, {opportunity_results['golden']} golden")
 print(f"{'=' * 50}")
+
 

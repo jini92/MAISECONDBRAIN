@@ -16,10 +16,16 @@ EMBEDDING_DIM = {
     "text-embedding-3-small": 1536,
     "text-embedding-3-large": 3072,
     "nomic-embed-text": 768,
+    "qwen3-embedding:0.6b": 1024,
     "all-MiniLM-L6-v2": 384,
     "jhgan/ko-sroberta-multitask": 768,
     "intfloat/multilingual-e5-base": 768,
 }
+
+# 기본 Ollama 임베딩 모델
+# nomic-embed-text → qwen3-embedding:0.6b 전환 (2026-02-24)
+# 이유: 한국어 검색 hit_rate 6% → 33% (5.5배), 임베딩 속도 2.3배 향상
+DEFAULT_OLLAMA_EMBED_MODEL = os.environ.get("MNEMO_EMBED_MODEL", "qwen3-embedding:0.6b")
 
 # 선택 가능한 sentence-transformers 모델
 SBERT_MODELS = {
@@ -104,12 +110,14 @@ def embed_openai(
 
 def embed_ollama(
     texts: dict[str, str],
-    model: str = "nomic-embed-text",
+    model: str | None = None,
     base_url: str = "http://localhost:11434",
 ) -> dict[str, np.ndarray]:
     """Ollama 로컬 모델로 임베딩 생성"""
     import ollama as _ollama
 
+    if model is None:
+        model = DEFAULT_OLLAMA_EMBED_MODEL
     client = _ollama.Client(host=base_url)
     embeddings = {}
 
@@ -191,7 +199,7 @@ def embed_notes(
     if provider == "openai":
         new_embeddings = embed_openai(texts, model=model or "text-embedding-3-small", api_key=api_key)
     elif provider == "ollama":
-        new_embeddings = embed_ollama(texts, model=model or "nomic-embed-text")
+        new_embeddings = embed_ollama(texts, model=model or DEFAULT_OLLAMA_EMBED_MODEL)
     elif provider == "sbert":
         new_embeddings = embed_sbert(texts, model=model)
     else:

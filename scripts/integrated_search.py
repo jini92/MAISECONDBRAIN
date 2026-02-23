@@ -104,8 +104,9 @@ def _load_vault_context(cache_dir: str | None = None):
         try:
             import ollama
             import numpy as np
+            from mnemo.embedder import DEFAULT_OLLAMA_EMBED_MODEL
             def _embed(q):
-                resp = ollama.embed(model="nomic-embed-text", input=q[:2000])
+                resp = ollama.embed(model=DEFAULT_OLLAMA_EMBED_MODEL, input=q[:2000])
                 return np.array(resp["embeddings"][0], dtype=np.float32)
             query_embedding_fn = _embed
         except Exception:
