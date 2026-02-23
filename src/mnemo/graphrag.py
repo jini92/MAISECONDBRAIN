@@ -1,7 +1,11 @@
-"""GraphRAG 쿼리 엔진 — 벡터 + 그래프 하이브리드 검색 + LLM 답변"""
+"""GraphRAG 쿼리 엔진 — 벡터 + 그래프 하이브리드 검색 + LLM 답변
+
+Phase 4 (2026-02-24): Ollama LLM 통합으로 자연어 답변 생성 지원.
+"""
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -14,6 +18,35 @@ from .vector_search import search as vector_search
 
 if TYPE_CHECKING:
     from .parser import NoteDocument
+
+
+def ollama_llm_fn(prompt: str, model: str | None = None) -> str:
+    """Ollama 로컬 LLM으로 답변 생성."""
+    import ollama
+
+    if model is None:
+        model = os.environ.get("MNEMO_LLM_MODEL", "llama3.1:8b")
+
+    try:
+        resp = ollama.chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            options={"temperature": 0.3, "num_predict": 1000},
+        )
+        answer = resp["message"]["content"].strip()
+        # qwen3 thinking 태그 제거
+        import re
+        answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.DOTALL).strip()
+        return answer
+    except Exception as e:
+        return f"[LLM Error: {e}]"
+
+
+def get_default_llm_fn():
+    """환경변수 기반으로 기본 LLM 함수 반환. 비활성이면 None."""
+    if os.environ.get("MNEMO_USE_LLM", "").lower() in ("true", "1", "yes"):
+        return ollama_llm_fn
+    return None
 
 
 @dataclass

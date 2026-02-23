@@ -74,11 +74,10 @@ def search_memory_files(query: str, top_k: int = 5) -> list[dict]:
     return scored[:top_k]
 
 
-def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> list[dict]:
-    """Mnemo 볼트 검색 (search.py 로직 재사용)."""
+def _load_vault_context(cache_dir: str | None = None):
+    """볼트 검색에 필요한 공통 컨텍스트 로드."""
     from mnemo.cache import BuildCache
     from mnemo.embedder import EmbeddingCache
-    from mnemo.hybrid_search import hybrid_search
 
     if cache_dir is None:
         cache_dir = str(PROJECT_ROOT / ".mnemo")
@@ -86,7 +85,7 @@ def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> li
     cache = BuildCache(cache_dir)
     G = cache.load_graph()
     if G is None:
-        return []
+        return None, {}, {}, None
 
     notes_content: dict[str, str] = {}
     for node, data in G.nodes(data=True):
@@ -100,15 +99,30 @@ def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> li
     emb_cache = EmbeddingCache(cache_dir)
     embeddings = emb_cache.load()
 
-    query_embedding = None
+    query_embedding_fn = None
     if embeddings:
         try:
             import ollama
             import numpy as np
-            resp = ollama.embed(model="nomic-embed-text", input=query[:2000])
-            query_embedding = np.array(resp["embeddings"][0], dtype=np.float32)
+            def _embed(q):
+                resp = ollama.embed(model="nomic-embed-text", input=q[:2000])
+                return np.array(resp["embeddings"][0], dtype=np.float32)
+            query_embedding_fn = _embed
         except Exception:
             pass
+
+    return G, embeddings, notes_content, query_embedding_fn
+
+
+def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> list[dict]:
+    """Mnemo 볼트 검색 (하이브리드: 키워드 + 벡터 + 그래프)."""
+    from mnemo.hybrid_search import hybrid_search
+
+    G, embeddings, notes_content, embed_fn = _load_vault_context(cache_dir)
+    if G is None:
+        return []
+
+    query_embedding = embed_fn(query) if embed_fn else None
 
     results = hybrid_search(
         query=query, G=G, embeddings=embeddings,
@@ -141,6 +155,42 @@ def search_vault(query: str, top_k: int = 5, cache_dir: str | None = None) -> li
             "source": "vault",
         })
     return output
+
+
+def graphrag_query(query: str, top_k: int = 5, cache_dir: str | None = None,
+                   use_llm: bool = True) -> dict:
+    """GraphRAG 쿼리 — 하이브리드 검색 + 그래프 확장 + LLM 답변 생성.
+
+    Returns:
+        {"answer": str, "sources": [...], "expanded_nodes": int}
+    """
+    from mnemo.graphrag import query as grag_query, get_default_llm_fn, ollama_llm_fn
+
+    G, embeddings, notes_content, embed_fn = _load_vault_context(cache_dir)
+    if G is None:
+        return {"answer": "그래프를 로드할 수 없습니다.", "sources": [], "expanded_nodes": 0}
+
+    query_embedding = embed_fn(query) if embed_fn else None
+    llm_fn = ollama_llm_fn if use_llm else None
+
+    result = grag_query(
+        question=query,
+        G=G,
+        embeddings=embeddings,
+        notes_content=notes_content,
+        query_embedding=query_embedding,
+        embed_fn=embed_fn,
+        llm_fn=llm_fn,
+        top_k=top_k,
+        hops=2,
+    )
+
+    return {
+        "answer": result.answer,
+        "sources": result.sources,
+        "graph_context": result.graph_context[:5],
+        "expanded_nodes": result.expanded_nodes,
+    }
 
 
 def integrated_search(query: str, top_k: int = 5, fmt: str = "json"):
@@ -193,8 +243,23 @@ def main():
     parser.add_argument("query", help="검색어")
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--format", choices=["json", "text"], default="json")
+    parser.add_argument("--graphrag", action="store_true", help="GraphRAG 모드 (LLM 답변 생성)")
+    parser.add_argument("--no-llm", action="store_true", help="GraphRAG에서 LLM 없이 소스만 반환")
     args = parser.parse_args()
-    integrated_search(args.query, args.top_k, args.format)
+
+    if args.graphrag:
+        result = graphrag_query(args.query, args.top_k, use_llm=not args.no_llm)
+        if args.format == "json":
+            print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(f"=== GraphRAG Answer ===")
+            print(result["answer"])
+            print(f"\n=== Sources ({len(result['sources'])}) ===")
+            for s in result["sources"]:
+                print(f"  [{s.get('combined_score', 0):.3f}] {s['name']} ({s.get('entity_type', '?')})")
+            print(f"\nExpanded nodes: {result['expanded_nodes']}")
+    else:
+        integrated_search(args.query, args.top_k, args.format)
 
 
 if __name__ == "__main__":
