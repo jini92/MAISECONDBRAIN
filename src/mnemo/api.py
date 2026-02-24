@@ -5,6 +5,7 @@ Obsidian 플러그인 + 외부 앱용 REST API.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 from pathlib import Path
@@ -99,13 +100,50 @@ def _resolve_node(G: nx.DiGraph, path_or_name: str) -> str | None:
 
 
 # ── Startup ──────────────────────────────────────────────────
+def _precompute_full_layout(max_nodes: int = 500) -> None:
+    """Full graph 레이아웃을 사전 계산하여 캐시.
+
+    서버 시작 시 백그라운드로 실행하여 첫 /graph/full 요청이
+    spring_layout 계산을 기다리지 않도록 한다.
+    """
+    G = _state.get("graph")
+    if G is None:
+        return
+
+    # PageRank 상위 노드로 제한
+    work = G
+    if G.number_of_nodes() > max_nodes:
+        pr = nx.pagerank(G)
+        top = sorted(pr, key=pr.get, reverse=True)[:max_nodes]
+        work = G.subgraph(top).copy()
+
+    layout_key = f"layout_{work.number_of_nodes()}"
+    if layout_key in _state:
+        return  # 이미 캐시됨
+
+    t0 = time.time()
+    pos = nx.spring_layout(work, k=0.5, iterations=50, seed=42)
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
+        rx = (max_x - min_x) or 1
+        ry = (max_y - min_y) or 1
+        pos = {k: ((v[0] - min_x) / rx * 1000, (v[1] - min_y) / ry * 1000) for k, v in pos.items()}
+    _state[layout_key] = pos
+    print(f"[Mnemo] Full layout precomputed: {work.number_of_nodes()} nodes in {time.time()-t0:.1f}s")
+
+
 @app.on_event("startup")
 async def startup():
-    """서버 시작 시 캐시된 그래프 로드."""
+    """서버 시작 시 캐시된 그래프 로드 + 레이아웃 사전 계산."""
     loaded = _load_graph()
     if loaded:
         G = _state["graph"]
         print(f"[Mnemo] Graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+        # 백그라운드에서 full graph 레이아웃 사전 계산
+        asyncio.get_event_loop().run_in_executor(None, _precompute_full_layout, 500)
     else:
         print("[Mnemo] No cached graph found. Use POST /enrich or `mnemo build`.")
 
@@ -396,7 +434,7 @@ def enrich():
 # ── GET /graph/full — 전체 그래프 (사전 계산 레이아웃) ────────
 @app.get("/graph/full")
 def full_graph(
-    max_nodes: int = Query(3500, ge=100, le=10000),
+    max_nodes: int = Query(500, ge=100, le=10000),
 ):
     """전체 그래프를 사전 계산된 레이아웃 좌표와 함께 반환.
     
