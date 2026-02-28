@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+﻿import { App, PluginSettingTab, Setting } from "obsidian";
 import type MnemoPlugin from "./main";
 
 // 플러그인 설정 인터페이스 / Plugin settings interface
@@ -26,12 +26,15 @@ export class MnemoSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Mnemo SecondBrain Settings" });
+
+    new Setting(containerEl)
+      .setName("Mnemo SecondBrain settings")
+      .setHeading();
 
     // API URL 설정
     new Setting(containerEl)
       .setName("Mnemo API URL")
-      .setDesc("Mnemo FastAPI 서버 주소 / Mnemo server address")
+      .setDesc("Mnemo FastAPI server address (default: http://127.0.0.1:8000)")
       .addText((text) =>
         text
           .setPlaceholder("http://127.0.0.1:8000")
@@ -46,7 +49,7 @@ export class MnemoSettingTab extends PluginSettingTab {
     // 검색 결과 수
     new Setting(containerEl)
       .setName("Search result limit")
-      .setDesc("검색 결과 최대 개수 / Maximum number of results")
+      .setDesc("Maximum number of search results to show")
       .addSlider((slider) =>
         slider
           .setLimits(5, 50, 5)
@@ -61,7 +64,7 @@ export class MnemoSettingTab extends PluginSettingTab {
     // 검색 모드
     new Setting(containerEl)
       .setName("Search mode")
-      .setDesc("검색 방식 선택 / Select search method")
+      .setDesc("Select the search method to use")
       .addDropdown((dropdown) =>
         dropdown
           .addOptions({

@@ -1,4 +1,4 @@
-import { requestUrl } from "obsidian";
+﻿import { requestUrl } from "obsidian";
 
 // Mnemo API 검색 결과 타입 / Search result type
 export interface MnemoSearchResult {
@@ -31,6 +31,44 @@ export interface SubgraphEdge {
   type: string;
 }
 
+// API 응답 내부 타입 / Internal API response types
+interface RawSearchResult {
+  name?: string;
+  title?: string;
+  key?: string;
+  snippet?: string;
+  score?: number;
+  entity_type?: string;
+  source?: string;
+  path?: string;
+}
+
+interface SearchApiResponse {
+  results?: RawSearchResult[];
+}
+
+export interface ClusterInfo {
+  id: string;
+  hub_name: string;
+  size: number;
+  dominant_type: string;
+  x: number;
+  y: number;
+  index: number;
+}
+
+export interface ClustersResponse {
+  clusters: ClusterInfo[];
+  edges?: Array<{ source: string; target: string }>;
+}
+
+// 사전 계산된 레이아웃 좌표를 포함한 노드 타입
+export interface SubgraphNodeWithLayout extends SubgraphNode {
+  degree?: number;
+  x?: number;
+  y?: number;
+}
+
 export class MnemoApiClient {
   constructor(private baseUrl: string) {}
 
@@ -49,11 +87,18 @@ export class MnemoApiClient {
 
     try {
       const response = await requestUrl({ url, method: "GET" });
-      const data = response.json;
-      const results = (data.results ?? data) as any[];
-      return results.map((r: any) => ({
-        ...r,
+      const data = response.json as SearchApiResponse | RawSearchResult[];
+      const rawResults: RawSearchResult[] = Array.isArray(data)
+        ? data
+        : (data.results ?? []);
+      return rawResults.map((r: RawSearchResult): MnemoSearchResult => ({
+        name: r.name ?? "",
         title: r.title || r.name || r.key || "Untitled",
+        snippet: r.snippet ?? "",
+        score: r.score ?? 0,
+        entity_type: r.entity_type,
+        source: r.source,
+        path: r.path,
       }));
     } catch (err) {
       this.handleError(err);
@@ -92,10 +137,10 @@ export class MnemoApiClient {
   }
 
   // 클러스터 그래프 (계층적 탐색) / Cluster graph for drill-down
-  async clusters(): Promise<any | null> {
+  async clusters(): Promise<ClustersResponse | null> {
     try {
       const response = await requestUrl({ url: `${this.baseUrl}/graph/clusters`, method: "GET" });
-      return response.json;
+      return response.json as ClustersResponse;
     } catch (err) {
       this.handleError(err);
       return null;
@@ -103,10 +148,10 @@ export class MnemoApiClient {
   }
 
   // 클러스터 상세 (drill-down) / Cluster detail
-  async clusterDetail(index: number): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[] } | null> {
+  async clusterDetail(index: number): Promise<{ nodes: SubgraphNodeWithLayout[]; edges: SubgraphEdge[] } | null> {
     try {
       const response = await requestUrl({ url: `${this.baseUrl}/graph/cluster/${index}`, method: "GET" });
-      return response.json as { nodes: SubgraphNode[]; edges: SubgraphEdge[] };
+      return response.json as { nodes: SubgraphNodeWithLayout[]; edges: SubgraphEdge[] };
     } catch (err) {
       this.handleError(err);
       return null;
@@ -114,11 +159,11 @@ export class MnemoApiClient {
   }
 
   // 전체 그래프 (사전 계산 레이아웃) / Full graph with precomputed layout
-  async fullGraph(): Promise<{ nodes: SubgraphNode[]; edges: SubgraphEdge[]; layout: string } | null> {
+  async fullGraph(): Promise<{ nodes: SubgraphNodeWithLayout[]; edges: SubgraphEdge[]; layout: string } | null> {
     const url = `${this.baseUrl}/graph/full`;
     try {
       const response = await requestUrl({ url, method: "GET" });
-      return response.json as { nodes: SubgraphNode[]; edges: SubgraphEdge[]; layout: string };
+      return response.json as { nodes: SubgraphNodeWithLayout[]; edges: SubgraphEdge[]; layout: string };
     } catch (err) {
       this.handleError(err);
       return null;

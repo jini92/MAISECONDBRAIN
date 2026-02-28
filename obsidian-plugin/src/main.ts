@@ -1,4 +1,4 @@
-import { Plugin, Notice } from "obsidian";
+﻿import { Plugin, Notice } from "obsidian";
 import { MnemoApiClient } from "./api-client";
 import { MnemoSettings, MnemoSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { MnemoSearchModal } from "./search-modal";
@@ -17,15 +17,14 @@ export default class MnemoPlugin extends Plugin {
     this.addSettingTab(new MnemoSettingTab(this.app, this));
 
     // 리본 아이콘 / Ribbon icon
-    this.addRibbonIcon("brain", "Mnemo Search", () => {
+    this.addRibbonIcon("brain", "Mnemo search", () => {
       new MnemoSearchModal(this.app, this.apiClient, this.settings).open();
     });
 
-    // 검색 커맨드 (Ctrl+Shift+M) / Search command
+    // 검색 커맨드 / Search command
     this.addCommand({
       id: "mnemo-search",
       name: "Search Mnemo",
-      hotkeys: [{ modifiers: ["Ctrl", "Shift"], key: "m" }],
       callback: () => {
         new MnemoSearchModal(this.app, this.apiClient, this.settings).open();
       },
@@ -38,21 +37,21 @@ export default class MnemoPlugin extends Plugin {
     );
 
     // 그래프 뷰 리본 아이콘
-    this.addRibbonIcon("git-fork", "Mnemo Graph", () => {
-      this.openGraphView();
+    this.addRibbonIcon("git-fork", "Mnemo graph", () => {
+      void this.openGraphView();
     });
 
     // 그래프 뷰 열기 커맨드
     this.addCommand({
       id: "mnemo-open-graph",
-      name: "Mnemo: Open Graph View",
-      callback: () => this.openGraphView(),
+      name: "Mnemo: Open graph view",
+      callback: () => { void this.openGraphView(); },
     });
 
     // 서버 상태 확인 / Check server on load
     this.addCommand({
       id: "mnemo-check-status",
-      name: "Check Mnemo Server Status",
+      name: "Check Mnemo server status",
       callback: async () => {
         const stats = await this.apiClient.stats();
         if (stats) {
@@ -63,11 +62,11 @@ export default class MnemoPlugin extends Plugin {
       },
     });
 
-    console.log("Mnemo SecondBrain plugin loaded");
+    console.debug("Mnemo SecondBrain plugin loaded");
   }
 
   onunload(): void {
-    console.log("Mnemo SecondBrain plugin unloaded");
+    console.debug("Mnemo SecondBrain plugin unloaded");
   }
 
   async loadSettings(): Promise<void> {

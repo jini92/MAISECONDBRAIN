@@ -1,5 +1,5 @@
-import { ItemView, WorkspaceLeaf } from "obsidian";
-import type { MnemoApiClient, SubgraphNode, SubgraphEdge } from "./api-client";
+﻿import { ItemView, WorkspaceLeaf } from "obsidian";
+import type { MnemoApiClient, SubgraphNode, SubgraphEdge, ClusterInfo, SubgraphNodeWithLayout } from "./api-client";
 
 export const MNEMO_GRAPH_VIEW_TYPE = "mnemo-graph-view";
 
@@ -25,6 +25,7 @@ interface GraphNode {
   vy: number;
   radius: number;
   isCenter: boolean;
+  _clusterIndex?: number;
 }
 
 interface GraphEdge {
@@ -56,7 +57,7 @@ export class MnemoGraphView extends ItemView {
 
   private centerPath = "";
   private viewMode: "local" | "full" | "cluster" = "local";
-  private clusterData: any[] = [];
+  private clusterData: ClusterInfo[] = [];
   private backBtn: HTMLElement | null = null;
   private allBtns: HTMLElement[] = [];
 
@@ -68,7 +69,7 @@ export class MnemoGraphView extends ItemView {
   }
 
   getViewType(): string { return MNEMO_GRAPH_VIEW_TYPE; }
-  getDisplayText(): string { return "Mnemo Graph"; }
+  getDisplayText(): string { return "Mnemo graph"; }
   getIcon(): string { return "git-fork"; }
 
   async onOpen(): Promise<void> {
@@ -78,25 +79,25 @@ export class MnemoGraphView extends ItemView {
 
     // 툴바
     const toolbar = container.createDiv({ cls: "mnemo-graph-toolbar" });
-    toolbar.createEl("span", { text: "Mnemo Graph", cls: "mnemo-graph-title" });
+    toolbar.createEl("span", { text: "Mnemo graph", cls: "mnemo-graph-title" });
 
     const localBtn = toolbar.createEl("button", { text: "📍 Local", cls: "mnemo-graph-btn mnemo-graph-btn-active", attr: { title: "Current note graph" } });
-    localBtn.addEventListener("click", () => { this.setActiveBtn(localBtn); this.viewMode = "local"; this.loadGraph(); });
+    localBtn.addEventListener("click", () => { this.setActiveBtn(localBtn); this.viewMode = "local"; void this.loadGraph(); });
 
-    const clusterBtn = toolbar.createEl("button", { text: "🔮 Explore", cls: "mnemo-graph-btn", attr: { title: "Explore by clusters (drill-down)" } });
-    clusterBtn.addEventListener("click", () => { this.setActiveBtn(clusterBtn); this.viewMode = "cluster"; this.loadClusters(); });
+    const clusterBtn = toolbar.createEl("button", { text: "🔮 Explore", cls: "mnemo-graph-btn", attr: { title: "Explore by clusters" } });
+    clusterBtn.addEventListener("click", () => { this.setActiveBtn(clusterBtn); this.viewMode = "cluster"; void this.loadClusters(); });
 
     const fullBtn = toolbar.createEl("button", { text: "🌐 Full", cls: "mnemo-graph-btn", attr: { title: "Full knowledge graph" } });
-    fullBtn.addEventListener("click", () => { this.setActiveBtn(fullBtn); this.viewMode = "full"; this.loadFullGraph(); });
+    fullBtn.addEventListener("click", () => { this.setActiveBtn(fullBtn); this.viewMode = "full"; void this.loadFullGraph(); });
 
     this.backBtn = toolbar.createEl("button", { text: "← Back", cls: "mnemo-graph-btn", attr: { title: "Back to clusters" } });
-    this.backBtn.style.display = "none";
-    this.backBtn.addEventListener("click", () => { this.backBtn!.style.display = "none"; this.loadClusters(); });
+    this.backBtn.hide();
+    this.backBtn.addEventListener("click", () => { this.backBtn!.hide(); void this.loadClusters(); });
 
     this.allBtns = [localBtn, clusterBtn, fullBtn];
 
     const refreshBtn = toolbar.createEl("button", { text: "↻", cls: "mnemo-graph-btn", attr: { title: "Refresh" } });
-    refreshBtn.addEventListener("click", () => this.viewMode === "full" ? this.loadFullGraph() : this.loadGraph());
+    refreshBtn.addEventListener("click", () => { void (this.viewMode === "full" ? this.loadFullGraph() : this.loadGraph()); });
 
     const fitBtn = toolbar.createEl("button", { text: "⊡", cls: "mnemo-graph-btn", attr: { title: "Fit to view" } });
     fitBtn.addEventListener("click", () => this.fitToView());
@@ -108,12 +109,13 @@ export class MnemoGraphView extends ItemView {
     this.resizeCanvas();
     this.registerDomEvent(window, "resize", () => this.resizeCanvas());
     this.setupInteraction();
-    this.loadGraph();
+    await this.loadGraph();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     this.simRunning = false;
     if (this.animFrame) cancelAnimationFrame(this.animFrame);
+    return Promise.resolve();
   }
 
   // 현재 노트 기준 로드
@@ -126,7 +128,6 @@ export class MnemoGraphView extends ItemView {
       this.drawEmpty("Open a note, then refresh");
       return;
     }
-    // API는 .md 없는 경로를 사용할 수 있음
     this.centerPath = path;
     const apiPath = path.replace(/\.md$/, "");
 
@@ -140,10 +141,9 @@ export class MnemoGraphView extends ItemView {
     let nodes = data.nodes;
     let edges = data.edges;
     if (nodes.length > 80) {
-      const centerNode = nodes.find(n => n.id === path || n.id === path.replace(/\.md$/, ""));
       const keep = new Set<string>();
+      const centerNode = nodes.find(n => n.id === path || n.id === path!.replace(/\.md$/, ""));
       if (centerNode) keep.add(centerNode.id);
-      // score 높은 순으로 80개
       const sorted = [...nodes].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
       for (const n of sorted) {
         if (keep.size >= 80) break;
@@ -158,13 +158,13 @@ export class MnemoGraphView extends ItemView {
   }
 
   setCenterPath(path: string): void {
-    this.loadGraph(path);
+    void this.loadGraph(path);
   }
 
   private setActiveBtn(active: HTMLElement): void {
     for (const btn of this.allBtns) btn.removeClass("mnemo-graph-btn-active");
     active.addClass("mnemo-graph-btn-active");
-    if (this.backBtn) this.backBtn.style.display = "none";
+    if (this.backBtn) this.backBtn.hide();
   }
 
   async loadClusters(): Promise<void> {
@@ -179,7 +179,7 @@ export class MnemoGraphView extends ItemView {
     const w = this.canvas!.width;
     const h = this.canvas!.height;
 
-    this.nodes = data.clusters.map((c: any) => ({
+    this.nodes = data.clusters.map((c: ClusterInfo) => ({
       id: c.id,
       name: `${c.hub_name} (${c.size})`,
       type: c.dominant_type,
@@ -193,7 +193,7 @@ export class MnemoGraphView extends ItemView {
       _clusterIndex: c.index,
     }));
 
-    this.edges = (data.edges || []).map((e: any) => ({
+    this.edges = (data.edges ?? []).map((e) => ({
       source: e.source,
       target: e.target,
       type: "cluster_link",
@@ -218,13 +218,13 @@ export class MnemoGraphView extends ItemView {
     const w = this.canvas!.width;
     const h = this.canvas!.height;
 
-    this.nodes = data.nodes.map((n: any) => ({
+    this.nodes = data.nodes.map((n: SubgraphNodeWithLayout) => ({
       id: n.id,
       name: n.name,
       type: n.type,
       score: n.degree,
-      x: (n.x / 1000) * w * 0.9 + w * 0.05,
-      y: (n.y / 1000) * h * 0.9 + h * 0.05,
+      x: ((n.x ?? 0) / 1000) * w * 0.9 + w * 0.05,
+      y: ((n.y ?? 0) / 1000) * h * 0.9 + h * 0.05,
       vx: 0,
       vy: 0,
       radius: Math.max(4, Math.min(16, 4 + (n.degree || 0) * 0.1)),
@@ -237,7 +237,7 @@ export class MnemoGraphView extends ItemView {
     this.offsetY = 0;
     this.scale = 1;
     this.simRunning = false;
-    if (this.backBtn) this.backBtn.style.display = "inline-block";
+    if (this.backBtn) this.backBtn.show();
     this.draw();
   }
 
@@ -249,17 +249,16 @@ export class MnemoGraphView extends ItemView {
       return;
     }
 
-    // 사전 계산된 좌표 사용 — 시뮬레이션 불필요
     const w = this.canvas!.width;
     const h = this.canvas!.height;
 
-    this.nodes = data.nodes.map((n: any) => ({
+    this.nodes = data.nodes.map((n: SubgraphNodeWithLayout) => ({
       id: n.id,
       name: n.name,
       type: n.type,
       score: n.degree,
-      x: (n.x / 1000) * w * 0.9 + w * 0.05,
-      y: (n.y / 1000) * h * 0.9 + h * 0.05,
+      x: ((n.x ?? 0) / 1000) * w * 0.9 + w * 0.05,
+      y: ((n.y ?? 0) / 1000) * h * 0.9 + h * 0.05,
       vx: 0,
       vy: 0,
       radius: Math.max(3, Math.min(16, 3 + (n.degree || 0) * 0.05)),
@@ -334,8 +333,8 @@ export class MnemoGraphView extends ItemView {
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
         const a = nodes[i], b = nodes[j];
-        let dx = b.x - a.x, dy = b.y - a.y;
-        let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const force = repulsion / (dist * dist);
         const fx = (dx / dist) * force * alpha;
         const fy = (dy / dist) * force * alpha;
@@ -349,8 +348,8 @@ export class MnemoGraphView extends ItemView {
       const a = this.nodeMap.get(e.source);
       const b = this.nodeMap.get(e.target);
       if (!a || !b) continue;
-      let dx = b.x - a.x, dy = b.y - a.y;
-      let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
       const force = (dist - springLen) * springK * alpha;
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
@@ -554,9 +553,9 @@ export class MnemoGraphView extends ItemView {
     c.addEventListener("click", (e) => {
       const node = this.hitTest(e.offsetX, e.offsetY);
       if (node) {
-        if ((node as any)._clusterIndex != null) {
+        if (node._clusterIndex != null) {
           // 클러스터 → 드릴다운
-          this.drillIntoCluster((node as any)._clusterIndex);
+          void this.drillIntoCluster(node._clusterIndex);
         } else {
           this.openNote(node.id);
         }
@@ -591,7 +590,7 @@ export class MnemoGraphView extends ItemView {
     // id는 파일 경로 (예: "folder/note.md")
     const file = this.app.vault.getAbstractFileByPath(id);
     if (file) {
-      this.app.workspace.openLinkText(id, "", true);
+      void this.app.workspace.openLinkText(id, "", true);
     }
   }
 

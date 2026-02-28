@@ -1,8 +1,8 @@
-import { App, SuggestModal, Notice, TFile } from "obsidian";
+﻿import { App, SuggestModal, Notice, TFile } from "obsidian";
 import type { MnemoApiClient, MnemoSearchResult } from "./api-client";
 import type { MnemoSettings } from "./settings";
 
-// Mnemo 검색 모달 / Search modal (Ctrl+Shift+M)
+// Mnemo 검색 모달 / Search modal
 export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
   private results: MnemoSearchResult[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -13,7 +13,7 @@ export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
     private settings: MnemoSettings
   ) {
     super(app);
-    this.setPlaceholder("Mnemo 검색... / Search Mnemo...");
+    this.setPlaceholder("Search Mnemo...");
   }
 
   async getSuggestions(query: string): Promise<MnemoSearchResult[]> {
