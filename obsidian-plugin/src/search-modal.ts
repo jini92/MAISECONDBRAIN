@@ -13,7 +13,7 @@ export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
     private settings: MnemoSettings
   ) {
     super(app);
-    this.setPlaceholder("Search Mnemo...");
+    this.setPlaceholder("Mnemo search...");
   }
 
   async getSuggestions(query: string): Promise<MnemoSearchResult[]> {
@@ -22,13 +22,12 @@ export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
     // 디바운스 300ms / Debounce input
     return new Promise((resolve) => {
       if (this.debounceTimer) clearTimeout(this.debounceTimer);
-      this.debounceTimer = setTimeout(async () => {
-        this.results = await this.apiClient.search(
-          query,
-          this.settings.searchMode,
-          this.settings.searchLimit
-        );
-        resolve(this.results);
+      this.debounceTimer = setTimeout(() => {
+        void this.apiClient.search(query, this.settings.searchMode, this.settings.searchLimit)
+          .then((results) => {
+            this.results = results;
+            resolve(this.results);
+          });
       }, 300);
     });
   }
@@ -49,14 +48,14 @@ export class MnemoSearchModal extends SuggestModal<MnemoSearchResult> {
     });
   }
 
-  async onChooseSuggestion(result: MnemoSearchResult): Promise<void> {
+  onChooseSuggestion(result: MnemoSearchResult): void {
     // 볼트에서 해당 노트 열기 / Open matching note in vault
     let path = result.path || `${result.title}.md`;
     if (!path.endsWith(".md")) path += ".md";
     const file = this.app.vault.getAbstractFileByPath(path);
 
     if (file instanceof TFile) {
-      await this.app.workspace.getLeaf().openFile(file);
+      void this.app.workspace.getLeaf().openFile(file);
     } else {
       new Notice(`노트를 찾을 수 없습니다: ${result.title}\nNote not found in vault.`);
     }

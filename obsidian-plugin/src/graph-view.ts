@@ -81,16 +81,16 @@ export class MnemoGraphView extends ItemView {
     const toolbar = container.createDiv({ cls: "mnemo-graph-toolbar" });
     toolbar.createEl("span", { text: "Mnemo graph", cls: "mnemo-graph-title" });
 
-    const localBtn = toolbar.createEl("button", { text: "📍 Local", cls: "mnemo-graph-btn mnemo-graph-btn-active", attr: { title: "Current note graph" } });
+    const localBtn = toolbar.createEl("button", { text: "📍 local", cls: "mnemo-graph-btn mnemo-graph-btn-active", attr: { title: "Current note graph" } });
     localBtn.addEventListener("click", () => { this.setActiveBtn(localBtn); this.viewMode = "local"; void this.loadGraph(); });
 
-    const clusterBtn = toolbar.createEl("button", { text: "🔮 Explore", cls: "mnemo-graph-btn", attr: { title: "Explore by clusters" } });
+    const clusterBtn = toolbar.createEl("button", { text: "🔮 explore", cls: "mnemo-graph-btn", attr: { title: "Explore by clusters" } });
     clusterBtn.addEventListener("click", () => { this.setActiveBtn(clusterBtn); this.viewMode = "cluster"; void this.loadClusters(); });
 
-    const fullBtn = toolbar.createEl("button", { text: "🌐 Full", cls: "mnemo-graph-btn", attr: { title: "Full knowledge graph" } });
+    const fullBtn = toolbar.createEl("button", { text: "🌐 full", cls: "mnemo-graph-btn", attr: { title: "Full knowledge graph" } });
     fullBtn.addEventListener("click", () => { this.setActiveBtn(fullBtn); this.viewMode = "full"; void this.loadFullGraph(); });
 
-    this.backBtn = toolbar.createEl("button", { text: "← Back", cls: "mnemo-graph-btn", attr: { title: "Back to clusters" } });
+    this.backBtn = toolbar.createEl("button", { text: "← back", cls: "mnemo-graph-btn", attr: { title: "Back to clusters" } });
     this.backBtn.hide();
     this.backBtn.addEventListener("click", () => { this.backBtn!.hide(); void this.loadClusters(); });
 
@@ -142,7 +142,7 @@ export class MnemoGraphView extends ItemView {
     let edges = data.edges;
     if (nodes.length > 80) {
       const keep = new Set<string>();
-      const centerNode = nodes.find(n => n.id === path || n.id === path!.replace(/\.md$/, ""));
+      const centerNode = nodes.find(n => n.id === path || n.id === path.replace(/\.md$/, ""));
       if (centerNode) keep.add(centerNode.id);
       const sorted = [...nodes].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
       for (const n of sorted) {

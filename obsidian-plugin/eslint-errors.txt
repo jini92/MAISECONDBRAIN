@@ -1,0 +1,43 @@
+﻿
+C:\TEST\MAISECONDBRAIN\obsidian-plugin\src\api-client.ts
+  177:7  error  'console' is not defined  no-undef
+  182:7  error  'console' is not defined  no-undef
+
+C:\TEST\MAISECONDBRAIN\obsidian-plugin\src\graph-view.ts
+   84:57  error  Use sentence case for UI text                                                      obsidianmd/ui/sentence-case
+   87:59  error  Use sentence case for UI text                                                      obsidianmd/ui/sentence-case
+   90:56  error  Use sentence case for UI text                                                      obsidianmd/ui/sentence-case
+   93:55  error  Use sentence case for UI text                                                      obsidianmd/ui/sentence-case
+  110:27  error  'window' is not defined                                                            no-undef
+  117:25  error  'cancelAnimationFrame' is not defined                                              no-undef
+  145:68  error  This assertion is unnecessary since it does not change the type of the expression  @typescript-eslint/no-unnecessary-type-assertion
+  313:26  error  'requestAnimationFrame' is not defined                                             no-undef
+  319:22  error  'requestAnimationFrame' is not defined                                             no-undef
+  627:12  error  'document' is not defined                                                          no-undef
+
+C:\TEST\MAISECONDBRAIN\obsidian-plugin\src\main.ts
+  27:13  error  Use sentence case for UI text                                                                                                                                       obsidianmd/ui/sentence-case
+  47:13  error  Use sentence case for UI text                                                                                                                                       obsidianmd/ui/sentence-case
+  54:13  error  Use sentence case for UI text                                                                                                                                       obsidianmd/ui/sentence-case
+  60:22  error  Use sentence case for UI text                                                                                                                                       obsidianmd/ui/sentence-case
+  65:5   error  'console' is not defined                                                                                                                                            no-undef
+  69:5   error  'console' is not defined                                                                                                                                            no-undef
+  73:5   error  Unsafe assignment of an `any` value                                                                                                                                 @typescript-eslint/no-unsafe-assignment
+  89:5   error  Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the `void` operator  @typescript-eslint/no-floating-promises
+
+C:\TEST\MAISECONDBRAIN\obsidian-plugin\src\search-modal.ts
+   8:44  error  'setTimeout' is not defined                                                                                                        no-undef
+  16:25  error  Use sentence case for UI text                                                                                                      obsidianmd/ui/sentence-case
+  24:31  error  'clearTimeout' is not defined                                                                                                      no-undef
+  25:28  error  'setTimeout' is not defined                                                                                                        no-undef
+  25:39  error  Promise returned in function argument where a void return was expected                                                             @typescript-eslint/no-misused-promises
+  52:3   error  Promise-returning method provided where a void return was expected by extended/implemented type 'SuggestModal<MnemoSearchResult>'  @typescript-eslint/no-misused-promises
+
+C:\TEST\MAISECONDBRAIN\obsidian-plugin\src\settings.ts
+  30:5   error  Avoid using "settings" in settings headings           obsidianmd/settings-tab/no-problematic-settings-headings
+  30:5   error  Avoid including the plugin name in settings headings  obsidianmd/settings-tab/no-problematic-settings-headings
+  31:16  error  Use sentence case for UI text                         obsidianmd/ui/sentence-case
+
+??29 problems (29 errors, 0 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

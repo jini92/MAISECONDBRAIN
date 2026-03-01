@@ -27,10 +27,6 @@ export class MnemoSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName("Mnemo SecondBrain settings")
-      .setHeading();
-
     // API URL 설정
     new Setting(containerEl)
       .setName("Mnemo API URL")

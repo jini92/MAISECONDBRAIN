@@ -24,7 +24,7 @@ export default class MnemoPlugin extends Plugin {
     // 검색 커맨드 / Search command
     this.addCommand({
       id: "mnemo-search",
-      name: "Search Mnemo",
+      name: "Mnemo: search",
       callback: () => {
         new MnemoSearchModal(this.app, this.apiClient, this.settings).open();
       },
@@ -44,20 +44,20 @@ export default class MnemoPlugin extends Plugin {
     // 그래프 뷰 열기 커맨드
     this.addCommand({
       id: "mnemo-open-graph",
-      name: "Mnemo: Open graph view",
+      name: "Mnemo: open graph view",
       callback: () => { void this.openGraphView(); },
     });
 
     // 서버 상태 확인 / Check server on load
     this.addCommand({
       id: "mnemo-check-status",
-      name: "Check Mnemo server status",
+      name: "Mnemo: check server status",
       callback: async () => {
         const stats = await this.apiClient.stats();
         if (stats) {
           new Notice(`Mnemo: ${stats.total_notes} notes, ${stats.total_edges} edges`);
         } else {
-          new Notice("Mnemo: 서버에 연결할 수 없습니다 / Server unreachable");
+          new Notice("Mnemo: 서버에 연결할 수 없습니다 / server unreachable");
         }
       },
     });
@@ -70,7 +70,8 @@ export default class MnemoPlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const loaded = await this.loadData() as Partial<MnemoSettings>;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded);
   }
 
   async saveSettings(): Promise<void> {
@@ -86,7 +87,7 @@ export default class MnemoPlugin extends Plugin {
       leaf = this.app.workspace.getRightLeaf(false)!;
       await leaf.setViewState({ type: MNEMO_GRAPH_VIEW_TYPE, active: true });
     }
-    this.app.workspace.revealLeaf(leaf);
+    await this.app.workspace.revealLeaf(leaf);
 
     // 현재 노트 기준으로 그래프 로드
     const file = this.app.workspace.getActiveFile();
