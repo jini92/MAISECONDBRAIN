@@ -54,6 +54,17 @@ def _load_graph() -> bool:
     return G is not None
 
 
+def load_state(cache_dir: str | None = None) -> bool:
+    """Load state from cache for CLI/external callers.
+
+    If cache_dir is given, use that path; otherwise use default CACHE_DIR.
+    """
+    global CACHE_DIR
+    if cache_dir:
+        CACHE_DIR = cache_dir
+    return _load_graph()
+
+
 def _get_graph() -> nx.DiGraph:
     G = _state.get("graph")
     if G is None:
