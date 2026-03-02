@@ -209,26 +209,31 @@ try:
         edge_str = " \u00b7 ".join(f"`{k}` {v:,}" for k, v in edge_t.items())
         today = datetime.now().strftime("%Y-%m-%d")
 
+        # Top 3 hubs only for readability
+        hub_top3 = " · ".join(f"[[{n}]] ({d})" for n, d in hubs[:3])
+        # Entity types: top 5 only
+        et_top = list(et.items())[:5]
+        et_rows = "\n".join(f"| {k} | {v:,} |" for k, v in et_top)
+        # Wiki/related links only for edge summary
+        wiki = et.get("wiki_link", edge_t.get("wiki_link", 0))
+        related_cnt = edge_t.get("related", 0)
+
         return (
-            f"> **Last updated:** {today}\n"
+            f"> 📅 {today} · 🗂 **{s[\'nodes\']:,}** nodes · 🔗 **{s[\'edges\']:,}** edges\n"
             f"\n"
-            f"| Metric | Value |\n"
-            f"|--------|-------|\n"
-            f"| **Nodes** | {s['nodes']:,} |\n"
-            f"| **Edges** | {s['edges']:,} |\n"
-            f"| **Connected Components** | {s.get('weakly_connected_components', '?')} |\n"
-            f"| **Dangling Nodes** | {s.get('dangling_nodes', '?')} \u2705 |\n"
-            f"| **Density** | {s.get('density', 0):.4f} |\n"
+            f"| 항목 | 값 |\n"
+            f"|------|-----|\n"
+            f"| 연결 컴포넌트 | {s.get(\'weakly_connected_components\', \'?\')} |\n"
+            f"| Dangling 노트 | {s.get(\'dangling_nodes\', \'?\')} ✅ |\n"
+            f"| 밀도 | {s.get(\'density\', 0):.4f} |\n"
             f"\n"
-            f"**Entity Types:**\n"
-            f"{et_str}\n"
+            f"**주요 엔티티 타입**\n"
+            f"| 타입 | 수 |\n"
+            f"|------|-----|\n"
+            f"{et_rows}\n"
             f"\n"
-            f"**Edge Types:**\n"
-            f"{edge_str}\n"
-            f"\n"
-            f"**Top Hubs:** {hub_str}\n"
-            f"\n"
-            f"**Top PageRank:** {pr_str}"
+            f"**Top 허브 노트** (연결 수)\n"
+            f"{hub_top3}"
         )
 
     DASHBOARD_FILES = [
