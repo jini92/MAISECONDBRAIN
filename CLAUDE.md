@@ -236,3 +236,25 @@ python scripts/search.py "쿼리 텍스트"
 - 커밋 메시지: `feat:`, `fix:`, `refactor:`, `docs:` 등 Conventional Commits
 - 한 커밋에 하나의 논리적 변경만 포함
 - `.mnemo/`, `__pycache__/`, `*.egg-info/`, `dist/` → `.gitignore` 유지
+
+
+## ⚠️ Regression Guard
+
+Critical search parameters are locked by `tests/test_regression_guard.py`.
+Baseline values are documented in `benchmarks/baseline.json`.
+
+**Protected parameters:**
+| Parameter | Value | Source |
+|---|---|---|
+| Hybrid keyword weight | 0.5 | `src/mnemo/hybrid_search.py` |
+| Hybrid vector weight | 0.3 | `src/mnemo/hybrid_search.py` |
+| Hybrid graph weight | 0.2 | `src/mnemo/hybrid_search.py` |
+| Hybrid top_k | 10 | `src/mnemo/hybrid_search.py` |
+| Memory search top_k | 5 | `scripts/integrated_search.py` |
+| GraphRAG hops | 2 | `scripts/integrated_search.py` |
+
+**Before changing any protected parameter:**
+1. Run `pytest tests/test_regression_guard.py -v` to see what will break
+2. Update `benchmarks/baseline.json` with new values and rationale
+3. Update the guard test to match
+4. Document the change in commit message

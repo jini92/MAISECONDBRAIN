@@ -1,0 +1,37 @@
+{
+  "project": "MAISECONDBRAIN",
+  "version": "0.1.0",
+  "created": "2026-03-12",
+  "critical_settings": {
+    "hybrid_keyword_weight": {
+      "value": 0.5,
+      "source": "src/mnemo/hybrid_search.py::hybrid_search()",
+      "rationale": "Keyword weight 0.5 ensures exact term matches dominate search results."
+    },
+    "hybrid_vector_weight": {
+      "value": 0.3,
+      "source": "src/mnemo/hybrid_search.py::hybrid_search()",
+      "rationale": "Vector weight 0.3 balances semantic similarity with keyword precision."
+    },
+    "hybrid_graph_weight": {
+      "value": 0.2,
+      "source": "src/mnemo/hybrid_search.py::hybrid_search()",
+      "rationale": "Graph weight 0.2 adds structural context without overwhelming results."
+    },
+    "hybrid_top_k": {
+      "value": 10,
+      "source": "src/mnemo/hybrid_search.py::hybrid_search()",
+      "rationale": "Top-10 results is the optimal balance for user consumption."
+    },
+    "integrated_search_top_k": {
+      "value": 5,
+      "source": "scripts/integrated_search.py::search_memory_files()",
+      "rationale": "Top-5 memory results prevents noise in integrated search."
+    },
+    "graphrag_hops": {
+      "value": 2,
+      "source": "scripts/integrated_search.py::graphrag_query()",
+      "rationale": "2-hop graph expansion balances context breadth and relevance."
+    }
+  }
+}
