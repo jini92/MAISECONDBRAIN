@@ -31,6 +31,53 @@ export interface SubgraphEdge {
   type: string;
 }
 
+export type LineageDirection = "upstream" | "downstream" | "both";
+export type LineageRole = "center" | "upstream" | "downstream" | "bridge" | "unknown";
+
+export interface LineageNode {
+  id: string;
+  name: string;
+  path?: string;
+  entity_type?: string;
+  depth: number;
+  lineage_role?: LineageRole | string;
+}
+
+export interface LineageEdge {
+  source: string;
+  target: string;
+  type: string;
+  weight?: number;
+}
+
+export interface LineageCandidate {
+  id: string;
+  name: string;
+  path: string;
+  entity_type: string;
+  match_kind: string;
+  score: number;
+}
+
+export interface LineageAmbiguousDetail {
+  code: "ambiguous_node";
+  query: string;
+  message: string;
+  candidates: LineageCandidate[];
+}
+
+export interface LineageResponse {
+  center: string;
+  direction: LineageDirection | string;
+  depth: number;
+  nodes: LineageNode[];
+  edges: LineageEdge[];
+}
+
+export type LineageLookupResult =
+  | { kind: "ok"; data: LineageResponse }
+  | { kind: "ambiguous"; detail: LineageAmbiguousDetail };
+
 // API 응답 내부 타입 / Internal API response types
 interface RawSearchResult {
   name?: string;
@@ -136,6 +183,38 @@ export class MnemoApiClient {
     }
   }
 
+  // 계보 그래프 조회 / Get lineage graph around a note
+  async lineage(
+    node: string,
+    depth: number = 2,
+    direction: LineageDirection = "both"
+  ): Promise<LineageLookupResult | null> {
+    const params = new URLSearchParams({
+      node,
+      depth: String(depth),
+      direction,
+    });
+    const url = `${this.baseUrl}/graph/lineage?${params}`;
+    try {
+      const response = await requestUrl({ url, method: "GET" });
+      const payload = response.json as LineageResponse | { detail?: LineageAmbiguousDetail } | LineageAmbiguousDetail;
+      if (response.status === 409) {
+        const detail = this.extractAmbiguousDetail(payload);
+        if (detail) {
+          return { kind: "ambiguous", detail };
+        }
+      }
+      return { kind: "ok", data: payload as LineageResponse };
+    } catch (err) {
+      const detail = this.tryExtractAmbiguousDetail(err);
+      if (detail) {
+        return { kind: "ambiguous", detail };
+      }
+      this.handleError(err);
+      return null;
+    }
+  }
+
   // 클러스터 그래프 (계층적 탐색) / Cluster graph for drill-down
   async clusters(): Promise<ClustersResponse | null> {
     try {
@@ -171,6 +250,46 @@ export class MnemoApiClient {
   }
 
   // 에러 처리 / Error handling with friendly messages
+  private extractAmbiguousDetail(
+    payload: LineageResponse | { detail?: LineageAmbiguousDetail } | LineageAmbiguousDetail
+  ): LineageAmbiguousDetail | null {
+    if (typeof payload !== "object" || payload == null) {
+      return null;
+    }
+    const maybeWrapped = "detail" in payload && payload.detail ? payload.detail : payload;
+    if (
+      typeof maybeWrapped === "object"
+      && maybeWrapped != null
+      && "code" in maybeWrapped
+      && maybeWrapped.code === "ambiguous_node"
+      && "candidates" in maybeWrapped
+      && Array.isArray(maybeWrapped.candidates)
+    ) {
+      return maybeWrapped as LineageAmbiguousDetail;
+    }
+    return null;
+  }
+
+  private tryExtractAmbiguousDetail(err: unknown): LineageAmbiguousDetail | null {
+    if (typeof err !== "object" || err == null) {
+      return null;
+    }
+
+    const withText = err as { text?: string; status?: number; response?: { text?: string; status?: number } };
+    const text = withText.text ?? withText.response?.text;
+    const status = withText.status ?? withText.response?.status;
+    if (status !== 409 || !text) {
+      return null;
+    }
+
+    try {
+      const payload = JSON.parse(text) as LineageResponse | { detail?: LineageAmbiguousDetail } | LineageAmbiguousDetail;
+      return this.extractAmbiguousDetail(payload);
+    } catch {
+      return null;
+    }
+  }
+
   private handleError(err: unknown): void {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("ECONNREFUSED") || msg.includes("net::ERR")) {

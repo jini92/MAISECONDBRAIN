@@ -7,7 +7,8 @@ Personal knowledge graph with hybrid search (keyword + vector + graph) for your 
 ## Features
 
 - **Hybrid Search** (`Ctrl+Shift+M`): Combines keyword, vector (semantic), and graph-based search for highly relevant results
-- **Knowledge Graph View**: Visualize connections between your notes (in development)
+- **Graph View**: Explore local note neighborhoods, clusters, and the full knowledge graph
+- **Lineage View**: Inspect upstream/downstream lineage for the current note with clear center/upstream/downstream cues
 - **Server Status**: Check Mnemo API server connectivity from within Obsidian
 
 <!-- TODO: Add screenshots -->
@@ -72,9 +73,10 @@ Copy `main.js`, `manifest.json`, `styles.css` to `.obsidian/plugins/mnemo-second
 ## Usage
 
 1. Start the Mnemo API server
-2. In Obsidian, press `Ctrl+Shift+M` (or `Cmd+Shift+M` on macOS)
-3. Type your search query
-4. Select a result to open the corresponding note
+2. In Obsidian, press `Ctrl+Shift+M` (or `Cmd+Shift+M` on macOS) to search
+3. Use the ribbon or command palette to open **Mnemo graph**
+4. The graph opens in **lineage** mode by default for the current note
+5. Switch between lineage, local, explore, and full views from the graph toolbar
 
 ## FAQ
 

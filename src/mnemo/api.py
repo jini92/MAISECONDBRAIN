@@ -9,6 +9,7 @@ import asyncio
 import os
 import time
 from pathlib import Path
+from typing import Literal
 
 import networkx as nx
 from fastapi import FastAPI, HTTPException, Query
@@ -16,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .cache import BuildCache
 from .embedder import EmbeddingCache
+from .lineage import build_lineage_view, list_disambiguation_candidates, resolve_node_key
 
 app = FastAPI(title="Mnemo API", version="0.2.0")
 
@@ -101,13 +103,8 @@ def _relative_path(abs_path: str | None) -> str:
 
 
 def _resolve_node(G: nx.DiGraph, path_or_name: str) -> str | None:
-    """경로 또는 이름으로 노드 해석. 부분 매칭 지원."""
-    if path_or_name in G:
-        return path_or_name
-    # 부분 매칭
-    lower = path_or_name.lower()
-    matches = [n for n in G.nodes() if lower in n.lower()]
-    return matches[0] if matches else None
+    """Resolve a note key from node id, note path, or file name."""
+    return resolve_node_key(G, path_or_name, vault_path=VAULT_PATH or None)
 
 
 # ── Startup ──────────────────────────────────────────────────
@@ -397,8 +394,37 @@ def subgraph(
 
     return {"nodes": nodes, "edges": edges}
 
+# Lineage endpoint
+@app.get("/graph/lineage")
+def graph_lineage(
+    node: str = Query(..., description="note path or key"),
+    depth: int = Query(2, ge=1, le=5),
+    direction: Literal["upstream", "downstream", "both"] = Query(
+        "both",
+        description="upstream|downstream|both",
+    ),
+):
+    """Return a deterministic lineage view based on ontology relations."""
+    G = _get_graph()
+    center = _resolve_node(G, node)
+    if center is None:
+        candidates = list_disambiguation_candidates(G, node, vault_path=VAULT_PATH or None)
+        if candidates:
+            raise HTTPException(
+                409,
+                {
+                    "code": "ambiguous_node",
+                    "query": node,
+                    "message": "Multiple lineage nodes match this reference. Use an exact path/key.",
+                    "candidates": candidates,
+                },
+            )
+        raise HTTPException(404, f"Note '{node}' not found")
 
-# ── POST /enrich ─────────────────────────────────────────────
+    return build_lineage_view(G, center, depth=depth, direction=direction)
+
+
+# Enrich endpoint
 @app.post("/enrich")
 def enrich():
     """수동 enrichment 트리거 — 볼트 파싱 → 그래프 빌드 → 캐시 저장."""

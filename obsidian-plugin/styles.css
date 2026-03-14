@@ -49,6 +49,7 @@
   padding: 6px 10px;
   border-bottom: 1px solid var(--background-modifier-border);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .mnemo-graph-title {
@@ -77,8 +78,68 @@
   border-color: var(--interactive-accent);
 }
 
+.mnemo-graph-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  flex-shrink: 0;
+}
+
+.mnemo-graph-status {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mnemo-graph-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mnemo-graph-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--background-primary-alt);
+  color: var(--text-muted);
+  font-size: 11px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.mnemo-graph-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 .mnemo-graph-canvas {
   flex: 1;
   width: 100%;
   display: block;
+}
+
+
+.mnemo-lineage-candidate-title {
+  font-weight: 600;
+}
+
+.mnemo-lineage-candidate-meta {
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.mnemo-lineage-candidate-path {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 4px;
+  word-break: break-all;
 }
