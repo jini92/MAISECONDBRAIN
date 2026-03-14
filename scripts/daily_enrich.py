@@ -80,6 +80,7 @@ print("\n[5/9] Rebuilding graph...")
 notes = parse_vault(VAULT)
 notes.extend(memory_notes)
 from mnemo.graph_builder import build_graph, graph_stats
+from mnemo.ontology_shapes import validate_ontology_shapes
 from mnemo.cache import BuildCache
 cache = BuildCache(CACHE_DIR)
 G = build_graph(notes, include_tag_edges=True)
@@ -104,6 +105,22 @@ try:
     print(f"  Unknown classified: {sum(classify_result.values())}")
 except Exception as e:
     print(f"  Graph quality improvement error (skipped): {e}")
+
+# 5.2. SHACL-style ontology quality validation
+print("\n[5.2] Validating ontology shapes...")
+try:
+    quality_report = validate_ontology_shapes(notes, G)
+    cache.save_graph(G)
+    stats = graph_stats(G)
+    cache.save_stats(stats)
+    cache.save_quality_report(quality_report)
+    summary = quality_report.get("summary", {})
+    print(
+        f"  Quality score: {summary.get('quality_score', 0)} | "
+        f"warnings: {summary.get('warnings', 0)} | errors: {summary.get('errors', 0)}"
+    )
+except Exception as e:
+    print(f"  Ontology shape validation error (skipped): {e}")
 
 # 5.5. Generate stub notes for dangling references
 print("\n[6/9] Generating stub notes for dangling references...")
@@ -219,13 +236,13 @@ try:
         related_cnt = edge_t.get("related", 0)
 
         return (
-            f"> 📅 {today} · 🗂 **{s[\'nodes\']:,}** nodes · 🔗 **{s[\'edges\']:,}** edges\n"
+            f"> 📅 {today} · 🗂 **{s['nodes']:,}** nodes · 🔗 **{s['edges']:,}** edges\n"
             f"\n"
             f"| 항목 | 값 |\n"
             f"|------|-----|\n"
-            f"| 연결 컴포넌트 | {s.get(\'weakly_connected_components\', \'?\')} |\n"
-            f"| Dangling 노트 | {s.get(\'dangling_nodes\', \'?\')} ✅ |\n"
-            f"| 밀도 | {s.get(\'density\', 0):.4f} |\n"
+            f"| 연결 컴포넌트 | {s.get('weakly_connected_components', '?')} |\n"
+            f"| Dangling 노트 | {s.get('dangling_nodes', '?')} ✅ |\n"
+            f"| 밀도 | {s.get('density', 0):.4f} |\n"
             f"\n"
             f"**주요 엔티티 타입**\n"
             f"| 타입 | 수 |\n"

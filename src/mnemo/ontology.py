@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 
+from .ontology_shapes import CORE_ENTITY_TYPES, _normalize_type_name
 from .parser import NoteDocument
 
 # ── 태그 → 엔티티 타입 매핑 (v2: 키워드 대폭 확장) ──
@@ -117,9 +118,10 @@ def classify_entity(note: NoteDocument) -> str:
     5. 기본값 'note'
     """
     # 1. YAML type 직접 사용
-    yaml_type = note.frontmatter.get("type", "").strip().lower()
-    if yaml_type and yaml_type in TAG_ENTITY_MAP:
-        return yaml_type
+    raw_type = note.frontmatter.get("type")
+    normalized_type, _ = _normalize_type_name(raw_type)
+    if normalized_type in CORE_ENTITY_TYPES:
+        return normalized_type
 
     # 2. 파일명 패턴 매칭 (event 세분화 등)
     for pattern, entity_type in NAME_TYPE_RULES:

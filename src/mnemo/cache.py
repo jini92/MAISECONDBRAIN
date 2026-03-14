@@ -20,6 +20,7 @@ class BuildCache:
         self.checksums_path = self.cache_dir / "checksums.json"
         self.graph_path = self.cache_dir / "graph.pkl"
         self.stats_path = self.cache_dir / "stats.json"
+        self.quality_report_path = self.cache_dir / "ontology_quality_report.json"
 
     def load_checksums(self) -> dict[str, str]:
         """저장된 체크섬 로드"""
@@ -57,6 +58,19 @@ class BuildCache:
         """저장된 통계 로드"""
         if self.stats_path.exists():
             return json.loads(self.stats_path.read_text(encoding="utf-8"))
+        return None
+
+    def save_quality_report(self, report: dict) -> None:
+        """Save structured ontology quality validation results."""
+        self.quality_report_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+
+    def load_quality_report(self) -> dict | None:
+        """Load structured ontology quality validation results."""
+        if self.quality_report_path.exists():
+            return json.loads(self.quality_report_path.read_text(encoding="utf-8"))
         return None
 
     def get_changed_files(

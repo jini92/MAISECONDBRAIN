@@ -11,6 +11,7 @@ from rich.table import Table
 
 from .cache import BuildCache
 from .graph_builder import build_graph, graph_stats
+from .ontology_shapes import validate_ontology_shapes
 from .parser import parse_vault
 
 console = Console(force_terminal=True, force_jupyter=False)
@@ -64,6 +65,7 @@ def build(vault_path: str, cache_dir: str, tag_edges: bool, include_memory: str 
     t1 = time.time()
     console.print("  [dim]그래프 빌드 중...[/dim]", end="")
     G = build_graph(notes, include_tag_edges=tag_edges)
+    quality_report = validate_ontology_shapes(notes, G)
     t_build = time.time() - t1
     console.print(f"  ✅ {G.number_of_nodes()} 노드, {G.number_of_edges()} 엣지 ({t_build:.1f}s)")
 
@@ -74,6 +76,7 @@ def build(vault_path: str, cache_dir: str, tag_edges: bool, include_memory: str 
     cache.save_checksums(current_checksums)
     cache.save_graph(G)
     cache.save_stats(stats)
+    cache.save_quality_report(quality_report)
     console.print(f"  [dim]캐시 저장: {cache_dir}/[/dim]")
 
     # 요약 출력
@@ -286,6 +289,7 @@ def start(vault_path: str, port: int, host: str, cache_dir: str, tag_edges: bool
     t1 = time.time()
     console.print("  [dim]그래프 빌드 중..[/dim]", end="")
     G = build_graph(notes, include_tag_edges=tag_edges)
+    quality_report = validate_ontology_shapes(notes, G)
     stats = graph_stats(G)
     t_build = time.time() - t1
     console.print(f"  ✓ {G.number_of_nodes()} 노드, {G.number_of_edges()} 엣지 ({t_build:.1f}s)")
@@ -294,6 +298,7 @@ def start(vault_path: str, port: int, host: str, cache_dir: str, tag_edges: bool
     cache.save_checksums(current_checksums)
     cache.save_graph(G)
     cache.save_stats(stats)
+    cache.save_quality_report(quality_report)
 
     if not load_state(cache_dir):
         console.print("[red]캐시 로드 실패.[/red]")
@@ -352,6 +357,21 @@ def _print_build_summary(stats: dict):
         console.print(eg_table)
 
     # Top 허브
+    ontology_quality = stats.get("ontology_quality", {})
+    if ontology_quality:
+        q_table = Table(title="Ontology quality")
+        q_table.add_column("Metric", style="magenta")
+        q_table.add_column("Value", style="white")
+        q_table.add_row("Quality score", str(ontology_quality.get("quality_score", 0)))
+        q_table.add_row("Checked nodes", str(ontology_quality.get("checked_nodes", 0)))
+        q_table.add_row(
+            "Pass / warning / error",
+            f"{ontology_quality.get('passed_nodes', 0)} / {ontology_quality.get('warning_nodes', 0)} / {ontology_quality.get('error_nodes', 0)}",
+        )
+        q_table.add_row("Warnings", str(ontology_quality.get("warnings", 0)))
+        q_table.add_row("Errors", str(ontology_quality.get("errors", 0)))
+        console.print(q_table)
+
     top_hubs = stats.get("top_hubs", [])
     if top_hubs:
         hub_table = Table(title="🏆 Top 10 허브 노드 (연결 수)")

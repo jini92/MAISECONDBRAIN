@@ -219,7 +219,7 @@ def graph_stats(G: nx.DiGraph) -> dict:
     # 연결 컴포넌트 (약한 연결)
     weakly_connected = nx.number_weakly_connected_components(G)
 
-    return {
+    stats = {
         "nodes": G.number_of_nodes(),
         "edges": G.number_of_edges(),
         "dangling_nodes": dangling_count,
@@ -230,3 +230,9 @@ def graph_stats(G: nx.DiGraph) -> dict:
         "weakly_connected_components": weakly_connected,
         "density": nx.density(G),
     }
+
+    ontology_quality = G.graph.get("ontology_quality")
+    if ontology_quality:
+        stats["ontology_quality"] = ontology_quality
+
+    return stats
