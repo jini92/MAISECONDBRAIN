@@ -34,8 +34,11 @@ def search(
     if not embeddings:
         return []
 
-    # 매트릭스 연산으로 일괄 계산
-    names = list(embeddings.keys())
+    # Filter embeddings to match query_embedding dimension (handles model transitions)
+    target_dim = query_embedding.shape[0]
+    names = [n for n, v in embeddings.items() if v.shape == (target_dim,)]
+    if not names:
+        return []
     matrix = np.stack([embeddings[n] for n in names])
 
     # 정규화
