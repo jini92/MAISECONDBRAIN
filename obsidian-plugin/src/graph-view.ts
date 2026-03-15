@@ -1,4 +1,4 @@
-import { ItemView, Notice, SuggestModal, TFile, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, SuggestModal, WorkspaceLeaf } from "obsidian";
 import type {
   ClusterInfo,
   LineageAmbiguousDetail,
@@ -1051,14 +1051,14 @@ export class MnemoGraphView extends ItemView {
     }
   }
 
-  private resolveFileForNode(node: GraphNode): TFile | null {
+  private resolveFileForNode(node: GraphNode) {
     const candidates = [node.path, node.id, `${node.path ?? ""}.md`, `${node.id}.md`]
       .filter((candidate): candidate is string => Boolean(candidate))
       .map((candidate) => candidate.replace(/^\/+/, ""));
 
     for (const candidate of candidates) {
-      const file = this.app.vault.getAbstractFileByPath(candidate);
-      if (file instanceof TFile) {
+      const file = this.app.vault.getFileByPath(candidate);
+      if (file) {
         return file;
       }
     }

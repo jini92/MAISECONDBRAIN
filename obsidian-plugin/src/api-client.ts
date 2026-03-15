@@ -40,7 +40,7 @@ export interface LineageNode {
   path?: string;
   entity_type?: string;
   depth: number;
-  lineage_role?: LineageRole | string;
+  lineage_role?: LineageRole;
 }
 
 export interface LineageEdge {
@@ -68,10 +68,27 @@ export interface LineageAmbiguousDetail {
 
 export interface LineageResponse {
   center: string;
-  direction: LineageDirection | string;
+  direction: LineageDirection;
   depth: number;
   nodes: LineageNode[];
   edges: LineageEdge[];
+}
+
+function isLineageAmbiguousDetail(value: unknown): value is LineageAmbiguousDetail {
+  if (typeof value !== "object" || value == null) {
+    return false;
+  }
+
+  if (!("code" in value) || value.code !== "ambiguous_node") {
+    return false;
+  }
+
+  return "query" in value
+    && typeof value.query === "string"
+    && "message" in value
+    && typeof value.message === "string"
+    && "candidates" in value
+    && Array.isArray(value.candidates);
 }
 
 export type LineageLookupResult =
@@ -257,15 +274,8 @@ export class MnemoApiClient {
       return null;
     }
     const maybeWrapped = "detail" in payload && payload.detail ? payload.detail : payload;
-    if (
-      typeof maybeWrapped === "object"
-      && maybeWrapped != null
-      && "code" in maybeWrapped
-      && maybeWrapped.code === "ambiguous_node"
-      && "candidates" in maybeWrapped
-      && Array.isArray(maybeWrapped.candidates)
-    ) {
-      return maybeWrapped as LineageAmbiguousDetail;
+    if (isLineageAmbiguousDetail(maybeWrapped)) {
+      return maybeWrapped;
     }
     return null;
   }
