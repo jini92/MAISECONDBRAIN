@@ -5,6 +5,9 @@ $env:MNEMO_VAULT_PATH   = "C:\Users\jini9\OneDrive\Documents\JINI_SYNC"
 $env:MNEMO_MEMORY_PATH  = "C:\MAIBOT\memory"
 $env:MNEMO_PROJECT_ROOT = "C:\TEST\MAISECONDBRAIN"
 $env:PYTHONIOENCODING   = "utf-8"
+$env:MNEMO_LLM_NUM_PREDICT = "16"
+$env:MNEMO_LLM_KEEP_ALIVE = "30m"
+$env:MNEMO_LLM_TIMEOUT = "180"
 
 $logFile = "C:\TEST\MAISECONDBRAIN\logs\mnemo-api.log"
 New-Item -ItemType Directory -Force -Path "C:\TEST\MAISECONDBRAIN\logs" | Out-Null

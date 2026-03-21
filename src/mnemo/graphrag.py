@@ -28,11 +28,27 @@ def ollama_llm_fn(prompt: str, model: str | None = None) -> str:
         model = os.environ.get("MNEMO_LLM_MODEL", "llama3.1:8b")
 
     try:
-        resp = ollama.chat(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": 0.3, "num_predict": 1000},
-        )
+        host = os.environ.get("OLLAMA_HOST")
+        timeout = float(os.environ.get("MNEMO_LLM_TIMEOUT", "180"))
+        keep_alive = os.environ.get("MNEMO_LLM_KEEP_ALIVE", "30m")
+        # CPU-only cold starts for llama3.1:8b are slow on Windows, so keep
+        # default answers intentionally short and keep the model warm longer.
+        num_predict = int(os.environ.get("MNEMO_LLM_NUM_PREDICT", "16"))
+
+        client_kwargs = {"timeout": timeout}
+        if host:
+            client_kwargs["host"] = host
+        client = ollama.Client(**client_kwargs)
+
+        chat_kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "options": {"temperature": 0.3, "num_predict": num_predict},
+        }
+        if keep_alive:
+            chat_kwargs["keep_alive"] = keep_alive
+
+        resp = client.chat(**chat_kwargs)
         answer = resp["message"]["content"].strip()
         # qwen3 thinking 태그 제거
         import re
