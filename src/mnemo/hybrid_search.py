@@ -143,7 +143,7 @@ def hybrid_search(
     # Reranker 적용 (활성화된 경우)
     if is_reranker_enabled() and results:
         # reranker용으로 더 많은 후보 확보 후 재정렬
-        candidates = results[:top_k * 3]
+        rerank_candidates = results[:top_k * 3]
         rerank_input = [
             {
                 "key": r.key,
@@ -155,7 +155,7 @@ def hybrid_search(
                 "graph_score": r.graph_score,
                 "entity_type": r.entity_type,
             }
-            for r in candidates
+            for r in rerank_candidates
         ]
         reranked = rerank_search_results(query, rerank_input, top_k=top_k)
         results = [

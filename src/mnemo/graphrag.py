@@ -14,10 +14,9 @@ import numpy as np
 
 from .graph_search import expand_from_nodes, get_subgraph_context
 from .hybrid_search import hybrid_search
-from .vector_search import search as vector_search
 
 if TYPE_CHECKING:
-    from .parser import NoteDocument
+    pass
 
 
 def ollama_llm_fn(prompt: str, model: str | None = None) -> str:
@@ -35,10 +34,10 @@ def ollama_llm_fn(prompt: str, model: str | None = None) -> str:
         # default answers intentionally short and keep the model warm longer.
         num_predict = int(os.environ.get("MNEMO_LLM_NUM_PREDICT", "16"))
 
-        client_kwargs = {"timeout": timeout}
+        client_kwargs: dict[str, str | float] = {"timeout": timeout}
         if host:
             client_kwargs["host"] = host
-        client = ollama.Client(**client_kwargs)
+        client = ollama.Client(**client_kwargs)  # type: ignore[arg-type]
 
         chat_kwargs = {
             "model": model,

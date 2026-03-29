@@ -6,7 +6,6 @@ import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.parse import quote_plus
 
@@ -55,7 +54,7 @@ tags:
         if self.summary:
             body += f"## 요약\n\n{self.summary}\n\n"
 
-        body += f"## 수집 결과\n\n"
+        body += "## 수집 결과\n\n"
         for i, r in enumerate(self.results, 1):
             body += f"### {i}. {r.title}\n"
             body += f"- **URL:** {r.url}\n"

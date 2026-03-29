@@ -36,7 +36,7 @@ def build(vault_path: str, cache_dir: str, tag_edges: bool, include_memory: str 
     """볼트를 파싱하고 지식그래프를 빌드합니다."""
     cache = BuildCache(cache_dir)
 
-    console.print(f"\n[bold blue]🧠 Mnemo Build[/bold blue]")
+    console.print("\n[bold blue]🧠 Mnemo Build[/bold blue]")
     console.print(f"  Vault: {vault_path}")
 
     # 파싱
@@ -128,7 +128,7 @@ def neighbors(node_name: str, hops: int, cache_dir: str):
             node_name = matches[0]
             console.print(f"[dim]→ '{node_name}'[/dim]")
         else:
-            console.print(f"[yellow]후보:[/yellow]")
+            console.print("[yellow]후보:[/yellow]")
             for m in matches:
                 console.print(f"  • {m}")
             return
@@ -242,7 +242,7 @@ def serve(cache_dir: str, port: int, host: str):
     """FastAPI GraphRAG 서버를 시작합니다."""
     from .api import app, load_state
 
-    console.print(f"\n[bold blue]Mnemo API Server[/bold blue]")
+    console.print("\n[bold blue]Mnemo API Server[/bold blue]")
     console.print(f"  Loading cache from {cache_dir}...")
 
     if not load_state(cache_dir):
@@ -276,7 +276,7 @@ def start(vault_path: str, port: int, host: str, cache_dir: str, tag_edges: bool
     """
     from .api import app, load_state
 
-    console.print(f"\n[bold blue]🧠 Mnemo Start[/bold blue]")
+    console.print("\n[bold blue]🧠 Mnemo Start[/bold blue]")
     console.print(f"  Vault: {vault_path}")
 
     t0 = time.time()

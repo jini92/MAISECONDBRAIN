@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import Path
 
 import networkx as nx
 
@@ -129,7 +128,6 @@ def build_graph(
 
     import re as _re_sem
     for note in notes:
-        body_lower = note.body.lower()
         for link in note.wiki_links:
             target_key = link_resolver.get(link, link)
             if target_key == note.key:

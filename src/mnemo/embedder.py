@@ -215,6 +215,29 @@ def embed_notes(
     return result
 
 
+def get_embedding(query: str, model: str | None = None) -> np.ndarray:
+    """Unified single-query embedding function.
+
+    Selects the provider based on the ``MNEMO_EMBED_PROVIDER`` environment
+    variable (default ``"sbert"``).  Supported values: ``sbert``, ``openai``,
+    ``ollama``.
+
+    Returns a numpy float32 array compatible with vector search operations.
+    """
+    provider = os.environ.get("MNEMO_EMBED_PROVIDER", "sbert").lower()
+
+    if provider == "openai":
+        result = embed_openai({"_q": query}, model=model or "text-embedding-3-small")
+        return result["_q"]
+
+    if provider == "ollama":
+        result = embed_ollama({"_q": query}, model=model)
+        return result["_q"]
+
+    # default: sbert
+    return embed_query_sbert(query, model=model)
+
+
 class EmbeddingCache:
     """임베딩 캐시 관리 (.mnemo/embeddings/)"""
 

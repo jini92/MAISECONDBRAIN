@@ -8,6 +8,8 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -19,7 +21,21 @@ from .cache import BuildCache
 from .embedder import EmbeddingCache
 from .lineage import build_lineage_view, list_disambiguation_candidates, resolve_node_key
 
-app = FastAPI(title="Mnemo API", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Lifespan context manager — replaces deprecated on_event('startup')."""
+    loaded = _load_graph()
+    if loaded:
+        G = _state["graph"]
+        print(f"[Mnemo] Graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+        asyncio.get_event_loop().run_in_executor(None, _precompute_full_layout, 500)
+    else:
+        print("[Mnemo] No cached graph found. Use POST /enrich or `mnemo build`.")
+    yield
+
+
+app = FastAPI(title="Mnemo API", version="0.2.0", lifespan=lifespan)
 
 # CORS — Obsidian 플러그인 localhost 접근 허용
 app.add_middleware(
@@ -143,17 +159,8 @@ def _precompute_full_layout(max_nodes: int = 500) -> None:
     print(f"[Mnemo] Full layout precomputed: {work.number_of_nodes()} nodes in {time.time()-t0:.1f}s")
 
 
-@app.on_event("startup")
-async def startup():
-    """서버 시작 시 캐시된 그래프 로드 + 레이아웃 사전 계산."""
-    loaded = _load_graph()
-    if loaded:
-        G = _state["graph"]
-        print(f"[Mnemo] Graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
-        # 백그라운드에서 full graph 레이아웃 사전 계산
-        asyncio.get_event_loop().run_in_executor(None, _precompute_full_layout, 500)
-    else:
-        print("[Mnemo] No cached graph found. Use POST /enrich or `mnemo build`.")
+
+# Startup logic is now handled by the ``lifespan`` async context manager above.
 
 
 # ── GET /health ──────────────────────────────────────────────

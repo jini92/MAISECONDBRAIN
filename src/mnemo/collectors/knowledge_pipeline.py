@@ -10,7 +10,6 @@ from .web_collector import (
     CollectedKnowledge,
     SearchResult,
     search_brave,
-    search_github_trending,
     search_youtube,
 )
 

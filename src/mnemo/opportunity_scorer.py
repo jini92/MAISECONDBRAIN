@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -69,15 +68,20 @@ def _score_contribution(tags: dict) -> ScoreBreakdown:
     score = 0.0
     reasons = []
     if tags.get("open_source"):
-        score += 3; reasons.append("오픈소스 코드 공개 +3")
+        score += 3
+        reasons.append("오픈소스 코드 공개 +3")
     if tags.get("free_tool"):
-        score += 2; reasons.append("무료 도구/플러그인 제공 +2")
+        score += 2
+        reasons.append("무료 도구/플러그인 제공 +2")
     if tags.get("education"):
-        score += 2; reasons.append("교육 콘텐츠 +2")
+        score += 2
+        reasons.append("교육 콘텐츠 +2")
     if tags.get("social_impact"):
-        score += 2; reasons.append("사회적 문제 해결 +2")
+        score += 2
+        reasons.append("사회적 문제 해결 +2")
     if tags.get("community"):
-        score += 1; reasons.append("커뮤니티 형성 +1")
+        score += 1
+        reasons.append("커뮤니티 형성 +1")
     return ScoreBreakdown(min(score, 10), reasons)
 
 
@@ -85,15 +89,20 @@ def _score_revenue(tags: dict) -> ScoreBreakdown:
     score = 0.0
     reasons = []
     if tags.get("recurring"):
-        score += 3; reasons.append("반복 수익 (구독/SaaS) +3")
+        score += 3
+        reasons.append("반복 수익 (구독/SaaS) +3")
     if tags.get("high_margin"):
-        score += 2; reasons.append("높은 마진 +2")
+        score += 2
+        reasons.append("높은 마진 +2")
     if tags.get("large_tam"):
-        score += 2; reasons.append("시장 크기 (TAM > $1B) +2")
+        score += 2
+        reasons.append("시장 크기 (TAM > $1B) +2")
     if tags.get("fast_bep"):
-        score += 2; reasons.append("빠른 BEP +2")
+        score += 2
+        reasons.append("빠른 BEP +2")
     if tags.get("multi_channel"):
-        score += 1; reasons.append("다중 수익 채널 +1")
+        score += 1
+        reasons.append("다중 수익 채널 +1")
     return ScoreBreakdown(min(score, 10), reasons)
 
 
@@ -101,15 +110,20 @@ def _score_synergy(tags: dict) -> ScoreBreakdown:
     score = 0.0
     reasons = []
     if tags.get("shared_infra"):
-        score += 3; reasons.append("인프라 공유 가능 +3")
+        score += 3
+        reasons.append("인프라 공유 가능 +3")
     if tags.get("cross_sell"):
-        score += 2; reasons.append("크로스 셀링 가능 +2")
+        score += 2
+        reasons.append("크로스 셀링 가능 +2")
     if tags.get("shared_data"):
-        score += 2; reasons.append("데이터 공유 가능 +2")
+        score += 2
+        reasons.append("데이터 공유 가능 +2")
     if tags.get("shared_tech"):
-        score += 2; reasons.append("기술 스택 공유 +2")
+        score += 2
+        reasons.append("기술 스택 공유 +2")
     if tags.get("brand_synergy"):
-        score += 1; reasons.append("브랜드 시너지 +1")
+        score += 1
+        reasons.append("브랜드 시너지 +1")
     return ScoreBreakdown(min(score, 10), reasons)
 
 
@@ -117,15 +131,20 @@ def _score_feasibility(tags: dict) -> ScoreBreakdown:
     score = 0.0
     reasons = []
     if tags.get("existing_tech"):
-        score += 3; reasons.append("기존 기술로 구현 가능 +3")
+        score += 3
+        reasons.append("기존 기술로 구현 가능 +3")
     if tags.get("solo_dev"):
-        score += 2; reasons.append("1인 개발 가능 (MAIBOT 지원) +2")
+        score += 2
+        reasons.append("1인 개발 가능 (MAIBOT 지원) +2")
     if tags.get("low_regulation"):
-        score += 2; reasons.append("규제 리스크 낮음 +2")
+        score += 2
+        reasons.append("규제 리스크 낮음 +2")
     if tags.get("mvp_1month"):
-        score += 2; reasons.append("MVP 1개월 이내 +2")
+        score += 2
+        reasons.append("MVP 1개월 이내 +2")
     if tags.get("low_dependency"):
-        score += 1; reasons.append("외부 의존성 낮음 +1")
+        score += 1
+        reasons.append("외부 의존성 낮음 +1")
     return ScoreBreakdown(min(score, 10), reasons)
 
 
