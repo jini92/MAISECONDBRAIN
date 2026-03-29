@@ -6,6 +6,7 @@ sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
 sys.stderr.reconfigure(encoding="utf-8")
 sys.path.insert(0, "src")
 
+import json
 import time
 
 VAULT = os.environ.get("MNEMO_VAULT_PATH")
@@ -121,6 +122,72 @@ try:
     )
 except Exception as e:
     print(f"  Ontology shape validation error (skipped): {e}")
+
+# 5.3. Advanced SHACL validation (circular deps, cardinality, dangling, semantic, inverse)
+print("\n[5.3] Advanced SHACL validation...")
+try:
+    from mnemo.ontology_shapes import validate_graph_advanced
+    advanced_violations = validate_graph_advanced(G)
+    if advanced_violations:
+        from collections import Counter as _Counter
+        rule_counts = _Counter(v.rule for v in advanced_violations)
+        sev_counts = _Counter(v.severity for v in advanced_violations)
+        print(f"  Found {len(advanced_violations)} advanced violations:")
+        for rule, cnt in rule_counts.most_common():
+            print(f"    {rule}: {cnt}")
+        print(f"  Severity: {dict(sev_counts)}")
+
+        # Save advanced violations to report
+        adv_report = {
+            "total": len(advanced_violations),
+            "by_rule": dict(rule_counts),
+            "by_severity": dict(sev_counts),
+            "top_violations": [
+                {"node": v.node, "rule": v.rule, "severity": v.severity, "message": v.message}
+                for v in advanced_violations[:50]
+            ],
+        }
+        adv_path = Path(CACHE_DIR) / "advanced_shacl_report.json"
+        adv_path.write_text(json.dumps(adv_report, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        print("  No advanced violations found")
+except Exception as e:
+    print(f"  Advanced SHACL validation error (skipped): {e}")
+
+# 5.4. Lineage construction & statistics
+print("\n[5.4] Building lineage views...")
+try:
+    from mnemo.lineage import build_lineage_view, lineage_stats
+
+    # Build lineage for top hub nodes (most connected)
+    hub_nodes = sorted(G.nodes(), key=lambda n: G.degree(n), reverse=True)[:20]
+    lineage_results = {}
+    for hub in hub_nodes:
+        try:
+            view = build_lineage_view(G, hub, depth=3, direction="both")
+            view["stats"] = lineage_stats(view)
+            lineage_results[hub] = {
+                "upstream": view["stats"]["upstream_count"],
+                "downstream": view["stats"]["downstream_count"],
+                "bridge": view["stats"]["bridge_count"],
+                "total_nodes": len(view["nodes"]),
+                "total_edges": len(view["edges"]),
+            }
+        except Exception:
+            continue
+
+    lineage_path = Path(CACHE_DIR) / "lineage_hub_stats.json"
+    lineage_path.write_text(
+        json.dumps(lineage_results, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    print(f"  Lineage computed for {len(lineage_results)} hub nodes")
+    if lineage_results:
+        top = list(lineage_results.items())[:5]
+        for node, st in top:
+            name = node.rsplit("/", 1)[-1][:30]
+            print(f"    {name}: up={st['upstream']} down={st['downstream']} bridge={st['bridge']}")
+except Exception as e:
+    print(f"  Lineage construction error (skipped): {e}")
 
 # 5.5. Generate stub notes for dangling references
 print("\n[6/9] Generating stub notes for dangling references...")
