@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import heapq
 from collections import defaultdict, deque
 from typing import Literal
 from urllib.parse import unquote
@@ -18,6 +19,11 @@ LINEAGE_EDGE_TYPES: tuple[str, ...] = (
     "used_in",
     "applied_to",
     "decisions",
+    "supports",
+    "contradicts",
+    "alternatives",
+    "wiki_link",
+    "related",
 )
 
 LINEAGE_RELATION_MODE: dict[str, RelationMode] = {
@@ -27,6 +33,11 @@ LINEAGE_RELATION_MODE: dict[str, RelationMode] = {
     "used_in": "target_downstream",
     "applied_to": "target_downstream",
     "decisions": "target_downstream",
+    "supports": "target_upstream",
+    "contradicts": "bidirectional",
+    "alternatives": "bidirectional",
+    "wiki_link": "bidirectional",
+    "related": "bidirectional",
 }
 
 LINEAGE_EDGE_PRIORITY: dict[str, int] = {
@@ -386,8 +397,16 @@ def build_lineage_view(
     *,
     depth: int = 2,
     direction: LineageDirection = "both",
+    entity_types: list[str] | None = None,
 ) -> dict:
-    """Build a deterministic lineage view centered on ontology relations."""
+    """Build a deterministic lineage view centered on ontology relations.
+
+    Parameters
+    ----------
+    entity_types:
+        When provided, only include nodes whose ``entity_type`` matches one of
+        the given strings.  The *center* node is always included regardless.
+    """
     if center not in G:
         raise KeyError(center)
 
@@ -416,6 +435,20 @@ def build_lineage_view(
             node_meta=node_meta,
             included=included,
         )
+
+    # Apply entity_type filter — center is always kept.
+    if entity_types is not None:
+        allowed = set(entity_types)
+        filtered = set()
+        for node in included:
+            if node == center:
+                continue
+            etype = G.nodes.get(node, {}).get("entity_type", "unknown")
+            if etype not in allowed:
+                filtered.add(node)
+        included -= filtered
+        for node in filtered:
+            node_meta.pop(node, None)
 
     nodes = []
     for node in sorted(
@@ -468,4 +501,209 @@ def build_lineage_view(
         "depth": depth,
         "nodes": nodes,
         "edges": edges,
+    }
+
+
+def build_weighted_lineage_view(
+    G: nx.DiGraph,
+    center: str,
+    *,
+    depth: int = 2,
+    direction: LineageDirection = "both",
+    entity_types: list[str] | None = None,
+) -> dict:
+    """Build a lineage view using Dijkstra-like weighted exploration.
+
+    Edges with higher ``weight`` values represent stronger connections.
+    The algorithm converts weights to costs (``1 / weight``) so that
+    stronger connections are explored first.  When all weights are equal
+    the result is equivalent to BFS order.
+
+    The returned dict matches the shape of :func:`build_lineage_view`
+    with an extra ``"weighted"`` flag and paths sorted by cumulative
+    weight (strongest first).
+    """
+    if center not in G:
+        raise KeyError(center)
+
+    upstream_adj, downstream_adj = _lineage_adjacency(G)
+
+    node_meta: dict[str, dict] = {
+        center: {"depth": 0, "lineage_role": "center", "cumulative_weight": 0.0}
+    }
+    included = {center}
+
+    def _dijkstra_walk(
+        adjacency: dict[str, list[tuple[str, dict]]],
+        role: Literal["upstream", "downstream"],
+    ) -> None:
+        # Priority queue: (cost, tie-break counter, node, hop_depth)
+        counter = 0
+        heap: list[tuple[float, int, str, int]] = [(0.0, counter, center, 0)]
+        best_cost: dict[str, float] = {center: 0.0}
+
+        while heap:
+            cost, _, current, hop_depth = heapq.heappop(heap)
+            if hop_depth >= depth:
+                continue
+            if cost > best_cost.get(current, float("inf")):
+                continue
+
+            for neighbor, edge_info in adjacency.get(current, []):
+                edge_weight = float(edge_info.get("weight", 1.0))
+                # Convert weight to cost: stronger connection = lower cost.
+                edge_cost = 1.0 / edge_weight if edge_weight > 0 else float("inf")
+                new_cost = cost + edge_cost
+                next_depth = hop_depth + 1
+
+                if new_cost < best_cost.get(neighbor, float("inf")):
+                    best_cost[neighbor] = new_cost
+                    included.add(neighbor)
+                    cum_weight = 1.0 / new_cost if new_cost > 0 else float("inf")
+                    existing = node_meta.get(neighbor)
+                    if existing is None:
+                        node_meta[neighbor] = {
+                            "depth": next_depth,
+                            "lineage_role": role,
+                            "cumulative_weight": round(cum_weight, 6),
+                        }
+                    else:
+                        existing["depth"] = min(int(existing["depth"]), next_depth)
+                        existing["lineage_role"] = _merge_role(
+                            str(existing["lineage_role"]), role
+                        )
+                        existing["cumulative_weight"] = round(
+                            max(float(existing.get("cumulative_weight", 0)), cum_weight),
+                            6,
+                        )
+                    counter += 1
+                    heapq.heappush(heap, (new_cost, counter, neighbor, next_depth))
+
+    if direction in ("upstream", "both"):
+        _dijkstra_walk(upstream_adj, "upstream")
+    if direction in ("downstream", "both"):
+        _dijkstra_walk(downstream_adj, "downstream")
+
+    # Apply entity_type filter — center is always kept.
+    if entity_types is not None:
+        allowed = set(entity_types)
+        filtered = set()
+        for node in included:
+            if node == center:
+                continue
+            etype = G.nodes.get(node, {}).get("entity_type", "unknown")
+            if etype not in allowed:
+                filtered.add(node)
+        included -= filtered
+        for node in filtered:
+            node_meta.pop(node, None)
+
+    # Sort nodes: strongest cumulative weight first (center always at top).
+    nodes = []
+    for node in sorted(
+        included,
+        key=lambda item: (
+            0 if item == center else 1,
+            -float(node_meta[item].get("cumulative_weight", 0)),
+            int(node_meta[item]["depth"]),
+            item.lower(),
+        ),
+    ):
+        data = G.nodes.get(node, {})
+        meta = node_meta[node]
+        nodes.append(
+            {
+                "id": node,
+                "name": data.get("name", node.rsplit("/", 1)[-1]),
+                "path": node,
+                "entity_type": data.get("entity_type", "unknown"),
+                "depth": int(meta["depth"]),
+                "lineage_role": str(meta["lineage_role"]),
+                "cumulative_weight": float(meta.get("cumulative_weight", 0)),
+            }
+        )
+
+    edge_map: dict[tuple[str, str, str], dict] = {}
+    for source, target, edge_data in G.edges(data=True):
+        lineage_edge = _canonical_lineage_edge(source, target, edge_data)
+        if lineage_edge is None:
+            continue
+        if lineage_edge["source"] not in included or lineage_edge["target"] not in included:
+            continue
+        key = (lineage_edge["source"], lineage_edge["target"], lineage_edge["type"])
+        if key not in edge_map:
+            edge_map[key] = lineage_edge
+
+    edges = [
+        edge_map[key]
+        for key in sorted(
+            edge_map,
+            key=lambda item: (
+                LINEAGE_EDGE_PRIORITY.get(item[2], len(LINEAGE_EDGE_PRIORITY)),
+                item[0].lower(),
+                item[1].lower(),
+                item[2],
+            ),
+        )
+    ]
+
+    return {
+        "center": center,
+        "direction": direction,
+        "depth": depth,
+        "weighted": True,
+        "nodes": nodes,
+        "edges": edges,
+    }
+
+
+def lineage_stats(lineage_view: dict) -> dict:
+    """Compute statistics from a lineage view dictionary.
+
+    Parameters
+    ----------
+    lineage_view:
+        The dict returned by :func:`build_lineage_view` or
+        :func:`build_weighted_lineage_view`.
+
+    Returns
+    -------
+    dict with keys:
+        ``upstream_count``, ``downstream_count``, ``bridge_count``,
+        ``relation_type_distribution``, ``entity_type_distribution``,
+        ``max_depth_reached``.
+    """
+    nodes = lineage_view.get("nodes", [])
+    edges = lineage_view.get("edges", [])
+
+    upstream_count = 0
+    downstream_count = 0
+    bridge_count = 0
+    entity_dist: dict[str, int] = defaultdict(int)
+    max_depth = 0
+
+    for node in nodes:
+        role = node.get("lineage_role", "")
+        if role == "upstream":
+            upstream_count += 1
+        elif role == "downstream":
+            downstream_count += 1
+        elif role == "bridge":
+            bridge_count += 1
+        entity_dist[node.get("entity_type", "unknown")] += 1
+        d = int(node.get("depth", 0))
+        if d > max_depth:
+            max_depth = d
+
+    relation_dist: dict[str, int] = defaultdict(int)
+    for edge in edges:
+        relation_dist[edge.get("type", "unknown")] += 1
+
+    return {
+        "upstream_count": upstream_count,
+        "downstream_count": downstream_count,
+        "bridge_count": bridge_count,
+        "relation_type_distribution": dict(relation_dist),
+        "entity_type_distribution": dict(entity_dist),
+        "max_depth_reached": max_depth,
     }

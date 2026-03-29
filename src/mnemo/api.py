@@ -10,6 +10,7 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
 from typing import Literal
 
@@ -19,7 +20,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .cache import BuildCache
 from .embedder import EmbeddingCache
-from .lineage import build_lineage_view, list_disambiguation_candidates, resolve_node_key
+from .lineage import (
+    build_lineage_view,
+    build_weighted_lineage_view,
+    lineage_stats,
+    list_disambiguation_candidates,
+    resolve_node_key,
+)
 
 
 @asynccontextmanager
@@ -34,8 +41,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         print("[Mnemo] No cached graph found. Use POST /enrich or `mnemo build`.")
     yield
 
-
-from importlib.metadata import version as _pkg_version
 
 app = FastAPI(title="Mnemo API", version=_pkg_version("mnemo-secondbrain"), lifespan=lifespan)
 
@@ -412,6 +417,11 @@ def graph_lineage(
         "both",
         description="upstream|downstream|both",
     ),
+    entity_types: str | None = Query(
+        None,
+        description="Comma-separated entity types to include (e.g. concept,project)",
+    ),
+    weighted: bool = Query(False, description="Use weighted Dijkstra exploration"),
 ):
     """Return a deterministic lineage view based on ontology relations."""
     G = _get_graph()
@@ -430,7 +440,21 @@ def graph_lineage(
             )
         raise HTTPException(404, f"Note '{node}' not found")
 
-    return build_lineage_view(G, center, depth=depth, direction=direction)
+    parsed_entity_types: list[str] | None = None
+    if entity_types:
+        parsed_entity_types = [t.strip() for t in entity_types.split(",") if t.strip()]
+
+    if weighted:
+        view = build_weighted_lineage_view(
+            G, center, depth=depth, direction=direction, entity_types=parsed_entity_types,
+        )
+    else:
+        view = build_lineage_view(
+            G, center, depth=depth, direction=direction, entity_types=parsed_entity_types,
+        )
+
+    view["stats"] = lineage_stats(view)
+    return view
 
 
 # Enrich endpoint

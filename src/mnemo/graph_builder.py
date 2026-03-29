@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
 
 import networkx as nx
 
@@ -52,6 +53,58 @@ def _build_link_resolver(notes: list[NoteDocument]) -> dict[str, str]:
         resolver[note.key] = note.key
 
     return resolver
+
+
+DEFAULT_SCAN_FORMATS: frozenset[str] = frozenset({".md"})
+
+
+def scan_vault_multiformat(
+    vault_path: str | Path,
+    scan_formats: set[str] | None = None,
+    exclude_dirs: set[str] | None = None,
+) -> list[NoteDocument]:
+    """Scan a vault directory for documents in multiple formats.
+
+    Args:
+        vault_path: Root directory to scan.
+        scan_formats: File extensions to include (e.g., {".md", ".pdf", ".docx"}).
+            Defaults to {".md"} only.  Pass ``None`` for the default.
+        exclude_dirs: Directory names to skip.
+
+    Returns:
+        List of parsed ``NoteDocument`` instances.
+    """
+    vault = Path(vault_path)
+    if not vault.exists():
+        raise FileNotFoundError(f"Vault not found: {vault}")
+
+    if exclude_dirs is None:
+        exclude_dirs = {".obsidian", ".trash", ".git", "node_modules", ".mnemo"}
+
+    if scan_formats is None:
+        scan_formats = set(DEFAULT_SCAN_FORMATS)
+
+    # For non-.md formats, use the multi-format dispatcher
+    from .parsers import parse_document
+
+    notes: list[NoteDocument] = []
+    for file_path in sorted(vault.rglob("*")):
+        if not file_path.is_file():
+            continue
+        suffix = file_path.suffix.lower()
+        if suffix not in scan_formats:
+            continue
+        if any(part in exclude_dirs for part in file_path.parts):
+            continue
+
+        try:
+            doc = parse_document(file_path, vault_root=vault)
+            notes.append(doc)
+        except (ValueError, ImportError, Exception):
+            # Skip files that cannot be parsed (missing libs, corrupted, etc.)
+            continue
+
+    return notes
 
 
 def build_graph(

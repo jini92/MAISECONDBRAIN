@@ -484,3 +484,242 @@ def validate_ontology_shapes(notes: list[NoteDocument], G: nx.DiGraph) -> dict[s
     G.graph["ontology_quality_top_violations"] = report["violations"][:50]
     return report
 
+
+# ── Advanced Graph-Level Validation ─────────────────────────────────────
+
+# Relationship types that form dependency chains worth checking for cycles.
+_DEPENDENCY_RELATIONS = {"derived_from", "supports", "uses"}
+
+# Inverse relationship pairs: if A->B via key, B->A should have the value.
+INVERSE_RELATIONS: dict[str, str] = {
+    "uses": "used_in",
+    "used_in": "uses",
+    "supports": "supported_by",
+    "supported_by": "supports",
+    "derived_from": "derives",
+    "derives": "derived_from",
+}
+
+# Cardinality constraints beyond TYPE_REQUIREMENTS.
+# Format: {entity_type: {"min_of": (fields_tuple, min_count, severity)}}
+CARDINALITY_CONSTRAINTS: dict[str, list[tuple[tuple[str, ...], int, str]]] = {
+    "person": [
+        (("role", "organization"), 1, "warning"),
+    ],
+    "decision": [
+        (("chosen", "rationale", "alternatives"), 2, "warning"),
+    ],
+}
+
+
+def check_circular_dependencies(G: nx.DiGraph) -> list[ShapeViolation]:
+    """의존 관계(derived_from, supports, uses)에서 순환 참조를 탐지한다.
+
+    각 관계 유형별로 서브그래프를 추출한 뒤 사이클을 찾아 warning을 반환한다.
+    """
+    violations: list[ShapeViolation] = []
+
+    for rel_type in _DEPENDENCY_RELATIONS:
+        sub = nx.DiGraph()
+        for u, v, data in G.edges(data=True):
+            if data.get("relation") == rel_type:
+                sub.add_edge(u, v)
+
+        for cycle in nx.simple_cycles(sub):
+            cycle_path = " → ".join(cycle + [cycle[0]])
+            for node in cycle:
+                entity_type = str(G.nodes.get(node, {}).get("entity_type", "unknown"))
+                violations.append(
+                    ShapeViolation(
+                        node=node,
+                        entity_type=entity_type,
+                        severity="warning",
+                        rule="circular-dependency",
+                        field=rel_type,
+                        actual=cycle_path,
+                        message=f"순환 참조 발견 ({rel_type}): {cycle_path}",
+                    )
+                )
+
+    return violations
+
+
+def check_cardinality_constraints(G: nx.DiGraph) -> list[ShapeViolation]:
+    """엔티티별 카디널리티 제약 조건을 검증한다.
+
+    TYPE_REQUIREMENTS의 required/any_of와 별도로, 최소 N개 이상 필드가
+    존재해야 하는 고급 제약 조건을 검사한다.
+    """
+    violations: list[ShapeViolation] = []
+
+    for node_key in G.nodes:
+        node_data = G.nodes[node_key]
+        entity_type = str(node_data.get("entity_type", "unknown"))
+
+        constraints = CARDINALITY_CONSTRAINTS.get(entity_type)
+        if not constraints:
+            continue
+
+        for fields, min_count, severity in constraints:
+            present = sum(1 for f in fields if _value_present(node_data.get(f)))
+            if present < min_count:
+                fields_str = ", ".join(fields)
+                violations.append(
+                    ShapeViolation(
+                        node=node_key,
+                        entity_type=entity_type,
+                        severity=severity,
+                        rule="cardinality-violation",
+                        field=fields_str,
+                        actual=f"{present}/{min_count}",
+                        message=(
+                            f"'{entity_type}' 노드는 [{fields_str}] 중 "
+                            f"최소 {min_count}개가 필요하지만 {present}개만 존재합니다."
+                        ),
+                    )
+                )
+
+    return violations
+
+
+def check_dangling_references(G: nx.DiGraph) -> list[ShapeViolation]:
+    """댕글링 참조(dangling=True 또는 entity_type='unknown') 노드를 탐지한다.
+
+    해당 노드를 참조하는 상위 노드 목록과 함께 경고를 반환한다.
+    """
+    violations: list[ShapeViolation] = []
+
+    for node_key in G.nodes:
+        node_data = G.nodes[node_key]
+        is_dangling = node_data.get("dangling") is True
+        is_unknown = str(node_data.get("entity_type", "")) in ("unknown", "dangling_ref")
+
+        if not (is_dangling or is_unknown):
+            continue
+
+        referring_nodes = [u for u, _ in G.in_edges(node_key)]
+        referrers_str = ", ".join(referring_nodes[:5]) if referring_nodes else "(없음)"
+        if len(referring_nodes) > 5:
+            referrers_str += f" 외 {len(referring_nodes) - 5}개"
+
+        entity_type = str(node_data.get("entity_type", "unknown"))
+        violations.append(
+            ShapeViolation(
+                node=node_key,
+                entity_type=entity_type,
+                severity="warning",
+                rule="dangling-reference",
+                field=None,
+                actual=referrers_str,
+                message=(
+                    f"댕글링 참조 노드입니다. "
+                    f"참조하는 노드: {referrers_str}"
+                ),
+            )
+        )
+
+    return violations
+
+
+def check_semantic_consistency(G: nx.DiGraph) -> list[ShapeViolation]:
+    """동일 타겟에 supports와 contradicts가 동시에 존재하는 모순을 탐지한다.
+
+    하나의 노드가 같은 대상을 지지하면서 동시에 반박하는 경우 error를 반환한다.
+    """
+    violations: list[ShapeViolation] = []
+
+    # 각 노드별로 supports/contradicts 타겟을 수집
+    supports_map: dict[str, set[str]] = {}
+    contradicts_map: dict[str, set[str]] = {}
+
+    for u, v, data in G.edges(data=True):
+        rel = data.get("relation")
+        if rel == "supports":
+            supports_map.setdefault(u, set()).add(v)
+        elif rel == "contradicts":
+            contradicts_map.setdefault(u, set()).add(v)
+
+    for node_key in supports_map:
+        if node_key not in contradicts_map:
+            continue
+        conflicts = supports_map[node_key] & contradicts_map[node_key]
+        for target in conflicts:
+            entity_type = str(G.nodes.get(node_key, {}).get("entity_type", "unknown"))
+            violations.append(
+                ShapeViolation(
+                    node=node_key,
+                    entity_type=entity_type,
+                    severity="error",
+                    rule="semantic-contradiction",
+                    field="supports/contradicts",
+                    actual=target,
+                    message=(
+                        f"'{node_key}'이(가) '{target}'을(를) "
+                        f"동시에 지지(supports)하고 반박(contradicts)합니다."
+                    ),
+                )
+            )
+
+    return violations
+
+
+def check_missing_inverse_relations(G: nx.DiGraph) -> list[ShapeViolation]:
+    """역방향 관계가 누락된 경우를 탐지한다.
+
+    예: A가 B를 'uses'하면 B에 'used_in' A가 있어야 한다.
+    누락된 역관계를 info 수준 제안으로 반환한다.
+    """
+    violations: list[ShapeViolation] = []
+
+    # 모든 엣지를 (source, target, relation) 튜플 집합으로 수집
+    edge_set: set[tuple[str, str, str]] = set()
+    for u, v, data in G.edges(data=True):
+        rel = data.get("relation")
+        if rel:
+            edge_set.add((u, v, rel))
+
+    checked: set[tuple[str, str, str]] = set()
+    for u, v, rel in edge_set:
+        inverse_rel = INVERSE_RELATIONS.get(rel)
+        if not inverse_rel:
+            continue
+
+        check_key = (u, v, rel)
+        if check_key in checked:
+            continue
+        checked.add(check_key)
+
+        # 역방향 엣지가 존재하는지 확인
+        if (v, u, inverse_rel) not in edge_set:
+            violations.append(
+                ShapeViolation(
+                    node=v,
+                    entity_type=str(G.nodes.get(v, {}).get("entity_type", "unknown")),
+                    severity="info",
+                    rule="missing-inverse-relation",
+                    field=inverse_rel,
+                    actual=f"{u} --{rel}--> {v}",
+                    message=(
+                        f"'{u}'이(가) '{v}'에 '{rel}' 관계를 가지지만, "
+                        f"역방향 '{inverse_rel}' 관계가 '{v}'에 없습니다."
+                    ),
+                )
+            )
+
+    return violations
+
+
+def validate_graph_advanced(G: nx.DiGraph) -> list[ShapeViolation]:
+    """그래프 수준의 고급 SHACL 검증을 모두 실행한다.
+
+    순환 참조, 카디널리티, 댕글링 참조, 의미적 일관성, 역관계 누락을
+    통합 검사하여 ShapeViolation 목록을 반환한다.
+    """
+    violations: list[ShapeViolation] = []
+    violations.extend(check_circular_dependencies(G))
+    violations.extend(check_cardinality_constraints(G))
+    violations.extend(check_dangling_references(G))
+    violations.extend(check_semantic_consistency(G))
+    violations.extend(check_missing_inverse_relations(G))
+    return violations
+
