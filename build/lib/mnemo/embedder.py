@@ -1,0 +1,244 @@
+"""임베딩 생성기 — OpenAI / Ollama / SentenceTransformers 지원"""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from .parser import NoteDocument
+
+EMBEDDING_DIM = {
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "nomic-embed-text": 768,
+    "qwen3-embedding:0.6b": 1024,
+    "all-MiniLM-L6-v2": 384,
+    "jhgan/ko-sroberta-multitask": 768,
+    "intfloat/multilingual-e5-base": 768,
+}
+
+# 기본 Ollama 임베딩 모델
+# nomic-embed-text → qwen3-embedding:0.6b 전환 (2026-02-24)
+# 이유: 한국어 검색 hit_rate 6% → 33% (5.5배), 임베딩 속도 2.3배 향상
+DEFAULT_OLLAMA_EMBED_MODEL = os.environ.get("MNEMO_EMBED_MODEL", "qwen3-embedding:0.6b")
+
+# 선택 가능한 sentence-transformers 모델
+SBERT_MODELS = {
+    "default": "all-MiniLM-L6-v2",
+    "korean": "jhgan/ko-sroberta-multitask",
+    "multilingual": "intfloat/multilingual-e5-base",
+}
+
+# lazy-loaded singleton
+_sbert_model = None
+_sbert_model_name = None
+
+
+def _get_sbert_model(model_name: str | None = None):
+    """SentenceTransformer 모델 lazy loading (싱글톤)"""
+    global _sbert_model, _sbert_model_name
+    if model_name is None:
+        model_key = os.environ.get("MNEMO_EMBEDDING_MODEL", "default")
+        model_name = SBERT_MODELS.get(model_key, model_key)
+    if _sbert_model is None or _sbert_model_name != model_name:
+        from sentence_transformers import SentenceTransformer
+        _sbert_model = SentenceTransformer(model_name)
+        _sbert_model_name = model_name
+    return _sbert_model
+
+
+def _prepare_text(note: NoteDocument, max_chars: int = 2000) -> str:
+    """노트 텍스트를 임베딩용으로 준비"""
+    parts = []
+    # 제목
+    parts.append(f"# {note.name}")
+    # 경로 (프로젝트 컨텍스트)
+    if note.path:
+        # 폴더명에서 프로젝트 정보 추출
+        path_str = str(note.path)
+        for segment in ["MAIOSS", "MAIBEAUTY", "MAIAX", "MAIBOT", "MAISTAR7", "MAICON",
+                        "MAITUTOR", "MAIBOTALKS", "MAITOK", "MAISECONDBRAIN"]:
+            if segment in path_str:
+                parts.append(f"Project: {segment}")
+                break
+    # 태그
+    if note.tags:
+        parts.append(f"Tags: {', '.join(note.tags)}")
+    # 엔티티 타입
+    entity_type = note.frontmatter.get("type", note.frontmatter.get("_inferred_type", ""))
+    if entity_type:
+        parts.append(f"Type: {entity_type}")
+    # 본문
+    parts.append(note.body.strip())
+
+    text = "\n".join(parts)
+    return text[:max_chars]
+
+
+def embed_openai(
+    texts: dict[str, str],
+    model: str = "text-embedding-3-small",
+    api_key: str | None = None,
+    batch_size: int = 100,
+) -> dict[str, np.ndarray]:
+    """OpenAI API로 임베딩 생성"""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key)
+    embeddings = {}
+    names = list(texts.keys())
+
+    for i in range(0, len(names), batch_size):
+        batch_names = names[i:i + batch_size]
+        batch_texts = [texts[n] for n in batch_names]
+
+        response = client.embeddings.create(
+            input=batch_texts,
+            model=model,
+        )
+
+        for j, item in enumerate(response.data):
+            embeddings[batch_names[j]] = np.array(item.embedding, dtype=np.float32)
+
+    return embeddings
+
+
+def embed_ollama(
+    texts: dict[str, str],
+    model: str | None = None,
+    base_url: str = "http://localhost:11434",
+) -> dict[str, np.ndarray]:
+    """Ollama 로컬 모델로 임베딩 생성"""
+    import ollama as _ollama
+
+    if model is None:
+        model = DEFAULT_OLLAMA_EMBED_MODEL
+    client = _ollama.Client(host=base_url)
+    embeddings = {}
+
+    for name, text in texts.items():
+        response = client.embed(model=model, input=text)
+        embeddings[name] = np.array(response["embeddings"][0], dtype=np.float32)
+
+    return embeddings
+
+
+def embed_sbert(
+    texts: dict[str, str],
+    model: str | None = None,
+    batch_size: int = 64,
+) -> dict[str, np.ndarray]:
+    """SentenceTransformers 로컬 모델로 임베딩 생성"""
+    st_model = _get_sbert_model(model)
+    names = list(texts.keys())
+    sentences = [texts[n] for n in names]
+    # e5 모델은 query/passage prefix 필요
+    if model and "e5" in model:
+        sentences = [f"passage: {s}" for s in sentences]
+    vectors = st_model.encode(sentences, batch_size=batch_size, show_progress_bar=False,
+                               convert_to_numpy=True, normalize_embeddings=True)
+    return {name: vec.astype(np.float32) for name, vec in zip(names, vectors)}
+
+
+def embed_query_sbert(query: str, model: str | None = None) -> np.ndarray:
+    """단일 쿼리를 SentenceTransformers로 임베딩"""
+    st_model = _get_sbert_model(model)
+    text = query
+    if model and "e5" in model:
+        text = f"query: {query}"
+    vec = st_model.encode(text, convert_to_numpy=True, normalize_embeddings=True)
+    return vec.astype(np.float32)
+
+
+def embed_notes(
+    notes: list[NoteDocument],
+    provider: str = "openai",
+    model: str | None = None,
+    api_key: str | None = None,
+    existing: dict[str, np.ndarray] | None = None,
+    changed_keys: set[str] | None = None,
+) -> dict[str, np.ndarray]:
+    """노트 리스트를 임베딩. 변경된 것만 재생성 (증분).
+
+    Args:
+        notes: 파싱된 노트 리스트
+        provider: "openai" or "ollama"
+        model: 모델명 (None이면 provider 기본값)
+        api_key: OpenAI API 키
+        existing: 기존 임베딩 캐시
+        changed_keys: 변경된 노트 키 (None이면 전체)
+
+    Returns:
+        {노트key: 벡터} 딕셔너리
+    """
+    if existing is None:
+        existing = {}
+
+    # 변경분만 임베딩
+    if changed_keys is not None:
+        to_embed = [n for n in notes if n.key in changed_keys]
+    else:
+        to_embed = [n for n in notes if n.key not in existing]
+
+    if not to_embed:
+        return existing
+
+    # 텍스트 준비 (최소 50자 이상만 임베딩)
+    texts = {}
+    for n in to_embed:
+        t = _prepare_text(n)
+        if len(t.strip()) >= 10:
+            texts[n.key] = t
+
+    # 임베딩 생성
+    if provider == "openai":
+        new_embeddings = embed_openai(texts, model=model or "text-embedding-3-small", api_key=api_key)
+    elif provider == "ollama":
+        new_embeddings = embed_ollama(texts, model=model or DEFAULT_OLLAMA_EMBED_MODEL)
+    elif provider == "sbert":
+        new_embeddings = embed_sbert(texts, model=model)
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+    # 기존 + 신규 병합
+    result = {**existing, **new_embeddings}
+
+    # 삭제된 노트 제거
+    note_keys = {n.key for n in notes}
+    result = {k: v for k, v in result.items() if k in note_keys}
+
+    return result
+
+
+class EmbeddingCache:
+    """임베딩 캐시 관리 (.mnemo/embeddings/)"""
+
+    def __init__(self, cache_dir: str | Path = ".mnemo"):
+        self.dir = Path(cache_dir) / "embeddings"
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.index_path = self.dir / "index.json"
+
+    def save(self, embeddings: dict[str, np.ndarray]) -> None:
+        """임베딩 저장 (단일 .npz 파일)"""
+        if not embeddings:
+            return
+        np.savez_compressed(
+            self.dir / "vectors.npz",
+            **{k: v for k, v in embeddings.items()},
+        )
+        # 인덱스 저장
+        index = {"count": len(embeddings), "names": list(embeddings.keys())}
+        self.index_path.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+
+    def load(self) -> dict[str, np.ndarray]:
+        """임베딩 로드"""
+        npz_path = self.dir / "vectors.npz"
+        if not npz_path.exists():
+            return {}
+        data = np.load(npz_path, allow_pickle=False)
+        return {k: data[k] for k in data.files}

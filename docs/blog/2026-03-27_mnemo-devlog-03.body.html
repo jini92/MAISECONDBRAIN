@@ -1,0 +1,200 @@
+<h1
+id="building-mnemo-in-public-3---why-i-split-memory-into-an-operational-layer-and-a-reasoning-layer">Building
+Mnemo in Public #3 - Why I split memory into an operational layer and a
+reasoning layer</h1>
+<blockquote>
+<p>This week I stopped treating memory like one giant bucket. MAIJINI
+now uses a small operational memory for action-changing facts and Mnemo
+as the deeper reasoning layer for long context, relationships, and
+cross-project recall.</p>
+</blockquote>
+<p>A lot of AI assistants fail in a boring way.</p>
+<p>They do not fail because the model is weak. They fail because memory
+becomes messy.</p>
+<p>One layer gets overloaded with everything:</p>
+<ul>
+<li>preferences</li>
+<li>temporary status</li>
+<li>meeting notes</li>
+<li>research fragments</li>
+<li>experimental logs</li>
+<li>relationship context</li>
+<li>half-finished ideas</li>
+</ul>
+<p>That looks comprehensive, but it quietly makes the system worse. The
+assistant becomes slower to retrieve the right thing, more likely to
+surface stale details, and less clear about what should actually change
+behavior right now.</p>
+<p>This week I finally made the split explicit.</p>
+<h2 id="the-decision">The decision</h2>
+<p>MAIJINI now uses two different memory layers on purpose.</p>
+<h3 id="1-operational-memory">1. Operational memory</h3>
+<p>This is the short, action-changing layer.</p>
+<p>It stores things like:</p>
+<ul>
+<li>preferences</li>
+<li>durable decisions</li>
+<li>current state</li>
+<li>next actions</li>
+<li>access paths</li>
+<li>operating rules</li>
+</ul>
+<p>In practice, this is the <code>memory/*.md</code> layer.</p>
+<p>It is intentionally small. If a note does not change how the
+assistant should operate, it probably does not belong here.</p>
+<h3 id="2-reasoning-memory">2. Reasoning memory</h3>
+<p>This is the deep context layer.</p>
+<p>It stores things like:</p>
+<ul>
+<li>long experiment history</li>
+<li>meeting context</li>
+<li>cross-project relationships</li>
+<li>background research</li>
+<li>document-level source material</li>
+<li>knowledge that needs synthesis, not just lookup</li>
+</ul>
+<p>For me, that layer is Mnemo. Mnemo sits on top of Obsidian and turns
+the vault into a knowledge graph plus GraphRAG retrieval system.</p>
+<p>That means I can ask for something more structural, like:</p>
+<ul>
+<li>why a decision was made</li>
+<li>what another project learned from a similar failure</li>
+<li>which ideas connect across multiple initiatives</li>
+<li>where a concept appeared before and what it influenced</li>
+</ul>
+<p>That is not the same job as a tiny operational memory. And trying to
+make one store do both jobs is how systems get noisy.</p>
+<h2 id="the-retrieval-order-changed-too">The retrieval order changed
+too</h2>
+<p>The more important part was not only storage. It was retrieval
+policy.</p>
+<p>The default recall flow is now:</p>
+<p><code>memory_search -&gt; Mnemo -&gt; web_search</code></p>
+<p>That order matters.</p>
+<h3 id="start-with-the-small-layer-first">Start with the small layer
+first</h3>
+<p>When a question is really about preference, status, or a previously
+made decision, the right answer is often already in the operational
+layer. That is the fastest and safest place to check.</p>
+<h3 id="go-deeper-only-when-confidence-is-still-low">Go deeper only when
+confidence is still low</h3>
+<p>If that is not enough, Mnemo becomes the second step. That is where
+deeper reasoning happens:</p>
+<ul>
+<li>graph relationships</li>
+<li>long-tail notes</li>
+<li>historical context</li>
+<li>cross-project inference</li>
+<li>source-backed synthesis</li>
+</ul>
+<h3 id="search-the-web-last">Search the web last</h3>
+<p>External search is still useful. But it should come after internal
+knowledge. If the answer already exists inside the system, I do not want
+the assistant acting like it forgot its own work.</p>
+<h2 id="why-this-mattered-now">Why this mattered now</h2>
+<p>This was not a theoretical cleanup. It came from real operator
+pain.</p>
+<p>Over the last few days, two things became obvious.</p>
+<p>First, some information needed to stay tiny and durable. For
+example:</p>
+<ul>
+<li>publishing cadence</li>
+<li>project priority order</li>
+<li>channel rules</li>
+<li>memory policy itself</li>
+<li>what counts as a real completion condition</li>
+</ul>
+<p>Second, some answers clearly needed a richer layer. The moment the
+question becomes:</p>
+<ul>
+<li>what changed across multiple projects</li>
+<li>why a trade-off was chosen</li>
+<li>what patterns repeat across experiments</li>
+<li>where a past design idea came from</li>
+</ul>
+<p>short operational notes are not enough. That is Mnemo territory.</p>
+<p>I do not want the agent to pretend those are the same kind of recall.
+They are not.</p>
+<h2 id="a-related-fix-stable-runtime-beats-clever-architecture">A
+related fix: stable runtime beats clever architecture</h2>
+<p>This week also surfaced another boring but important lesson. A lot of
+memory confusion was not actually “AI” confusion. It was systems
+confusion.</p>
+<p>Mnemo looked unhealthy from one angle because an older mental model
+still expected <code>localhost:7890</code>, while the live FastAPI
+service was already running on <code>127.0.0.1:8000</code>.</p>
+<p>That sounds small, but it matters. If your runtime surface and your
+operator assumptions drift apart, the memory layer looks unreliable even
+when the core system is fine.</p>
+<p>So part of this week was not inventing a new feature. It was
+restoring trust:</p>
+<ul>
+<li>confirm the live server path</li>
+<li>verify the retrieval route</li>
+<li>tune GraphRAG defaults for the actual Windows CPU environment</li>
+<li>stop confusing old assumptions with current reality</li>
+</ul>
+<p>I like architecture. But in practice, stable operators trust verified
+behavior more than pretty diagrams.</p>
+<h2 id="the-design-principle-underneath">The design principle
+underneath</h2>
+<p>I increasingly think agent memory should follow the same rule as
+software storage systems:</p>
+<p><strong>hot state and deep history should not be treated as the same
+class of data.</strong></p>
+<p>Operational memory is hot state. It should be:</p>
+<ul>
+<li>short</li>
+<li>explicit</li>
+<li>behavior-changing</li>
+<li>easy to update</li>
+<li>easy to trust</li>
+</ul>
+<p>Reasoning memory is deep history. It should be:</p>
+<ul>
+<li>broad</li>
+<li>relational</li>
+<li>source-backed</li>
+<li>synthesizable</li>
+<li>allowed to stay large</li>
+</ul>
+<p>If you mix them without a policy, the agent starts carrying a
+backpack full of everything and reaching for the wrong item at the wrong
+time.</p>
+<h2 id="what-this-unlocks">What this unlocks</h2>
+<p>This split is small, but I think it compounds.</p>
+<p>It makes the assistant better at:</p>
+<ul>
+<li>answering directly when the answer is already decided</li>
+<li>escalating to deeper recall only when needed</li>
+<li>keeping memory files clean enough to stay operational</li>
+<li>using Mnemo for actual reasoning instead of as a dumping ground</li>
+<li>recovering decision history without polluting the fast path</li>
+</ul>
+<p>And it makes build-in-public easier too. Because now I can describe
+the system more honestly:</p>
+<ul>
+<li><code>memory/*.md</code> is the operating memory</li>
+<li>Mnemo is the reasoning memory</li>
+<li>web search is the external fallback</li>
+</ul>
+<p>That is a cleaner product story than "there is one giant memory and
+it somehow does everything."</p>
+<h2 id="what-i-want-to-keep-improving">What I want to keep
+improving</h2>
+<p>The next steps are not glamorous, but they matter:</p>
+<ul>
+<li>keep shrinking operational memory to decision-grade notes only</li>
+<li>move long context and relationship-heavy material into Mnemo or
+Obsidian</li>
+<li>keep runtime defaults aligned with actual deployment paths</li>
+<li>make the retrieval boundaries more visible to the operator</li>
+</ul>
+<p>Good memory systems are not impressive because they store everything.
+They are impressive because they know what should stay small, what
+should stay deep, and when to cross that boundary.</p>
+<p>That is what I am trying to build with Mnemo.</p>
+<p>GitHub: <a
+href="https://github.com/jini92/MAISECONDBRAIN">https://github.com/jini92/MAISECONDBRAIN</a>
+PyPI: <a
+href="https://pypi.org/project/mnemo-secondbrain/">https://pypi.org/project/mnemo-secondbrain/</a></p>
