@@ -30,7 +30,7 @@ dependencies = [
 embeddings = ["openai>=1.0"]
 local = ["ollama>=0.1"]
 sbert = ["sentence-transformers>=2.2"]
-documents = ["pypdf>=4.0", "python-docx>=1.0", "openpyxl>=3.1", "python-pptx>=0.6"]
+documents = ["pypdf>=4.0", "python-docx>=1.0", "openpyxl>=3.1", "python-pptx>=0.6", "olefile>=0.46"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "build"]
 all = [
     "openai>=1.0",
@@ -39,6 +39,7 @@ all = [
     "python-docx>=1.0",
     "openpyxl>=3.1",
     "python-pptx>=0.6",
+    "olefile>=0.46",
 ]
 
 [project.urls]

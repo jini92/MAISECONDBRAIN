@@ -6,7 +6,7 @@ Usage::
 
     doc = parse_document(Path("report.pdf"), vault_root=Path("/vault"))
 
-Supported formats: .md, .pdf, .docx, .xlsx, .txt, .pptx
+Supported formats: .md, .pdf, .docx, .xlsx, .txt, .pptx, .hwp, .hwpx
 Non-.md formats require the ``documents`` optional dependency group::
 
     pip install 'mnemo-secondbrain[documents]'
@@ -26,6 +26,7 @@ from .docx import parse_docx
 from .xlsx import parse_xlsx
 from .txt import parse_txt
 from .pptx import parse_pptx
+from .hwp import parse_hwp, parse_hwpx
 
 # Public type alias for parser functions
 ParserFunc = Callable[[Path, "Path | None"], NoteDocument]
@@ -37,6 +38,8 @@ PARSERS: dict[str, ParserFunc] = {
     ".xlsx": parse_xlsx,
     ".txt": parse_txt,
     ".pptx": parse_pptx,
+    ".hwp": parse_hwp,
+    ".hwpx": parse_hwpx,
 }
 
 SUPPORTED_FORMATS: frozenset[str] = frozenset(PARSERS.keys())
@@ -76,6 +79,8 @@ __all__ = [
     "parse_xlsx",
     "parse_txt",
     "parse_pptx",
+    "parse_hwp",
+    "parse_hwpx",
     "SUPPORTED_FORMATS",
     "PARSERS",
     "NoteDocument",

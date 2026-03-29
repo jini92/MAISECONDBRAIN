@@ -61,7 +61,7 @@ class TestParseDocument:
     """Tests for the unified parse_document dispatcher."""
 
     def test_supported_formats_contains_all(self):
-        expected = {".md", ".pdf", ".docx", ".xlsx", ".txt", ".pptx"}
+        expected = {".md", ".pdf", ".docx", ".xlsx", ".txt", ".pptx", ".hwp", ".hwpx"}
         assert expected == SUPPORTED_FORMATS
 
     def test_unsupported_format_raises(self, tmp_dir: Path):
