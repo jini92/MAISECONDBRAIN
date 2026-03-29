@@ -35,7 +35,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="Mnemo API", version="0.2.0", lifespan=lifespan)
+from importlib.metadata import version as _pkg_version
+
+app = FastAPI(title="Mnemo API", version=_pkg_version("mnemo-secondbrain"), lifespan=lifespan)
 
 # CORS — Obsidian 플러그인 localhost 접근 허용
 app.add_middleware(
