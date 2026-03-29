@@ -1,6 +1,6 @@
 [project]
 name = "mnemo-secondbrain"
-version = "0.2.1"
+version = "0.2.2"
 description = "Personal knowledge graph system for Obsidian vaults with hybrid search"
 readme = "README.md"
 license = "MIT"
