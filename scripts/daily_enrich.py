@@ -458,6 +458,70 @@ try:
 except Exception as e:
     print(f"  Dashboard sync error (skipped): {e}")
 
+# ── Step 10: Sync to Railway server ──────────────────────────
+print("\n── Step 10: Server sync ──")
+_mnemo_api_url = os.getenv("MNEMO_API_URL", "")
+if _mnemo_api_url:
+    try:
+        import json as _json
+        from urllib.request import Request as _Req, urlopen as _urlopen
+
+        _health_resp = _urlopen(_Req(f"{_mnemo_api_url}/v2/health"), timeout=10)
+        _health = _json.loads(_health_resp.read().decode())
+        if _health.get("database", {}).get("available"):
+            print(f"  Server DB: {_health['database'].get('node_count', 0)} nodes")
+
+            _sync_nodes = []
+            for _name, _attrs in G.nodes(data=True):
+                _sync_nodes.append({
+                    "name": str(_name),
+                    "entity_type": _attrs.get("entity_type", _attrs.get("type", "note")),
+                    "content": _attrs.get("content", _attrs.get("snippet", "")),
+                    "source": _attrs.get("source", "vault"),
+                    "source_path": _attrs.get("path", ""),
+                })
+            _sync_edges = []
+            for _s, _t, _a in G.edges(data=True):
+                _sync_edges.append({
+                    "source": str(_s), "target": str(_t),
+                    "relation": _a.get("relation", _a.get("type", "related")),
+                    "weight": float(_a.get("weight", 1.0)),
+                })
+
+            _batch = 500
+            _n_total, _e_total = 0, 0
+            for _i in range(0, len(_sync_nodes), _batch):
+                _chunk = _sync_nodes[_i:_i + _batch]
+                _body = _json.dumps({"nodes": _chunk, "edges": []}).encode("utf-8")
+                _req = _Req(f"{_mnemo_api_url}/db/import", data=_body,
+                           headers={"Content-Type": "application/json"}, method="POST")
+                try:
+                    _r = _urlopen(_req, timeout=30)
+                    _d = _json.loads(_r.read().decode())
+                    _n_total += _d.get("nodes_imported", 0)
+                except Exception:
+                    pass
+
+            for _i in range(0, len(_sync_edges), _batch):
+                _chunk = _sync_edges[_i:_i + _batch]
+                _body = _json.dumps({"nodes": [], "edges": _chunk}).encode("utf-8")
+                _req = _Req(f"{_mnemo_api_url}/db/import", data=_body,
+                           headers={"Content-Type": "application/json"}, method="POST")
+                try:
+                    _r = _urlopen(_req, timeout=30)
+                    _d = _json.loads(_r.read().decode())
+                    _e_total += _d.get("edges_imported", 0)
+                except Exception:
+                    pass
+
+            print(f"  Synced: {_n_total} nodes, {_e_total} edges")
+        else:
+            print("  Server DB not available, skipping sync")
+    except Exception as _e:
+        print(f"  Server sync error (skipped): {_e}")
+else:
+    print("  MNEMO_API_URL not set, skipping server sync")
+
 # Summary
 elapsed = time.time() - t_total
 print(f"\n{'=' * 50}")
