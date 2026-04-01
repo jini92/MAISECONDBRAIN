@@ -718,6 +718,183 @@ def get_neighbors_legacy(node_name: str, hops: int = 2):
     return neighbors(node_name, depth=hops)
 
 
+# ── DB-backed endpoints (Central Knowledge API) ─────────────
+
+def _db_available() -> bool:
+    """Check if PostgreSQL is configured."""
+    return bool(os.environ.get("DATABASE_URL"))
+
+
+@app.get("/db/health")
+def db_health():
+    """Database-backed health check."""
+    if not _db_available():
+        return {"status": "no_database", "mode": "legacy_memory"}
+    try:
+        from .db import get_stats
+        stats = get_stats()
+        return {"status": "ok", "mode": "database", **stats}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+
+@app.get("/db/search")
+def db_search(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(10, ge=1, le=100),
+):
+    """Search knowledge graph via PostgreSQL."""
+    if not _db_available():
+        # Fallback to legacy in-memory search
+        return search(q=q, limit=limit)
+    from .db import search_keyword
+    results = search_keyword(q, limit=limit)
+    return {"results": results, "mode": "database"}
+
+
+@app.get("/db/neighbors/{name}")
+def db_neighbors(name: str, limit: int = Query(20, ge=1, le=100)):
+    """Get neighbors from PostgreSQL."""
+    if not _db_available():
+        return neighbors(name)
+    from .db import get_neighbors, get_node
+    node = get_node(name)
+    if not node:
+        raise HTTPException(404, f"Node '{name}' not found")
+    nbrs = get_neighbors(name, limit=limit)
+    return {"node": node, "neighbors": nbrs, "mode": "database"}
+
+
+@app.get("/db/stats")
+def db_stats():
+    """Graph statistics from PostgreSQL."""
+    if not _db_available():
+        return stats()
+    from .db import get_stats
+    return get_stats()
+
+
+@app.post("/db/nodes")
+def db_upsert_node(body: dict):
+    """Create or update a knowledge node."""
+    if not _db_available():
+        raise HTTPException(503, "Database not configured")
+    from .db import upsert_node
+    return upsert_node(
+        name=body["name"],
+        entity_type=body.get("entity_type", "note"),
+        content=body.get("content"),
+        metadata=body.get("metadata"),
+        source=body.get("source", "api"),
+        source_path=body.get("source_path"),
+    )
+
+
+@app.post("/db/edges")
+def db_upsert_edge(body: dict):
+    """Create or update an edge."""
+    if not _db_available():
+        raise HTTPException(503, "Database not configured")
+    from .db import upsert_edge
+    return upsert_edge(
+        source_name=body["source"],
+        target_name=body["target"],
+        relation=body.get("relation", "related"),
+        weight=body.get("weight", 1.0),
+    )
+
+
+@app.delete("/db/nodes/{name}")
+def db_delete_node(name: str):
+    """Delete a knowledge node."""
+    if not _db_available():
+        raise HTTPException(503, "Database not configured")
+    from .db import delete_node
+    delete_node(name)
+    return {"ok": True, "deleted": name}
+
+
+@app.post("/db/import")
+def db_import(body: dict):
+    """Bulk import nodes and edges."""
+    if not _db_available():
+        raise HTTPException(503, "Database not configured")
+    from .db import bulk_import_graph
+    return bulk_import_graph(body)
+
+
+@app.post("/db/sync")
+def db_sync():
+    """Sync in-memory graph to PostgreSQL (migration helper)."""
+    if not _db_available():
+        raise HTTPException(503, "Database not configured")
+    G = _state.get("graph")
+    if G is None:
+        raise HTTPException(404, "No in-memory graph loaded")
+
+    from .db import bulk_import_graph
+    nodes = []
+    for name, attrs in G.nodes(data=True):
+        nodes.append({
+            "name": str(name),
+            "entity_type": attrs.get("entity_type", attrs.get("type", "note")),
+            "content": attrs.get("content", attrs.get("snippet", "")),
+            "source": attrs.get("source", "vault"),
+            "source_path": attrs.get("path", ""),
+        })
+    edges = []
+    for src, tgt, attrs in G.edges(data=True):
+        edges.append({
+            "source": str(src),
+            "target": str(tgt),
+            "relation": attrs.get("relation", attrs.get("type", "related")),
+            "weight": float(attrs.get("weight", 1.0)),
+        })
+
+    result = bulk_import_graph({"nodes": nodes, "edges": edges})
+    return {"synced": True, **result}
+
+
+# ── Unified search (auto-selects DB or memory) ──────────────
+
+@app.get("/v2/search")
+def search_v2(
+    q: str = Query(..., description="Search query"),
+    limit: int = Query(10, ge=1, le=100),
+):
+    """Unified search — uses DB if available, falls back to in-memory."""
+    if _db_available():
+        from .db import search_keyword
+        results = search_keyword(q, limit=limit)
+        return {"results": results, "mode": "database", "query": q}
+    else:
+        return search(q=q, limit=limit)
+
+
+@app.get("/v2/health")
+def health_v2():
+    """Unified health check — reports both memory and DB status."""
+    G = _state.get("graph")
+    result = {
+        "status": "ok",
+        "version": app.version,
+        "memory": {
+            "graph_loaded": G is not None,
+            "node_count": G.number_of_nodes() if G else 0,
+            "edge_count": G.number_of_edges() if G else 0,
+        },
+        "database": {"available": False},
+    }
+    if _db_available():
+        try:
+            from .db import get_stats
+            db_stats = get_stats()
+            result["database"] = {"available": True, **db_stats}
+        except Exception as e:
+            result["database"] = {"available": False, "error": str(e)}
+    return result
+
+
 # ── Entry point ──────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn

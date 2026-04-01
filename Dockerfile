@@ -2,12 +2,16 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# Install system deps for psycopg2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 COPY pyproject.toml .
 COPY src/ src/
-RUN pip install --no-cache-dir -e ".[embeddings]"
+RUN pip install --no-cache-dir -e ".[embeddings]" psycopg2-binary
 
-# Copy pre-built graph cache
+# Copy pre-built graph cache (legacy fallback)
 COPY .mnemo/ /app/.mnemo/
 
 # Environment defaults
